@@ -1,5 +1,5 @@
-# archivist.py: Helper functions for Covid19CanadaArchive #
-# https://github.com/ccodwg/Covid19CanadaArchive #
+# archivist: Python-based digital archive tool currently powering the Canadian COVID-19 Data Archive #
+# https://github.com/jeanpaulrsoucy/archivist #
 # Maintainer: Jean-Paul R. Soucy #
 
 # import modules
@@ -23,6 +23,7 @@ from array import *
 import pandas as pd # better data processing
 import numpy as np # better data processing
 from colorit import * # colourful printing
+init_colorit() # enable printing with colour
 
 ## web scraping
 import requests
@@ -32,6 +33,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
+
+## email
+import smtplib
 
 ## Amazon S3
 import boto3
@@ -66,8 +70,6 @@ class Archivist:
         Archivist.s3 = s3
     def setPrefixRoot(prefix_root):
         Archivist.prefix_root = prefix_root
-
-    
 
 # define functions
 
@@ -610,6 +612,46 @@ def ss_page(url, dir_parent, dir_file, file, ext, uuid, user=False, wait=5, widt
         ## write failure to log message if mode == prod
         if Archivist.mode == 'prod':
             Archivist.logEntry('Failure: ' + full_name + '\n')
+
+## notifications
+
+def send_email(subject, body):
+    """Send email (e.g., a download log).
+    
+    Parameters:
+    subject (str): Subject line for the email.
+    body (str): Body of the email.
+    """
+    
+    ## load email configuration
+    mail_name = os.environ['MAIL_NAME'] # email account the message will be sent from
+    mail_pass = os.environ['MAIL_PASS'] # email password for the account the message will be sent from
+    mail_to = os.environ['MAIL_TO'] # email the message will be sent to
+    mail_sender = (os.environ['MAIL_ALIAS'] if 'MAIL_ALIAS' in os.environ.keys() else os.environ['MAIL_NAME']) # the listed sender of the email (either the mail_name or an alias email)
+    smtp_server = os.environ['SMTP_SERVER'] # SMTP server address
+    smtp_port = int(os.environ['SMTP_PORT']) # SMTP server port
+    
+    ## compose message
+    email_text = """\
+From: %s
+To: %s
+Subject: %s
+
+%s
+""" % (mail_sender, mail_to, subject, body)
+    
+    ## send message
+    try:
+        print('Sending message...')
+        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        server.ehlo()
+        server.login(mail_name, mail_pass)
+        server.sendmail(mail_sender, mail_to, email_text)
+        server.close()
+        print('Message sent!')
+    except Exception as e:
+        print(e)
+        print('Message failed to send.')
 
 ## indexing
 
