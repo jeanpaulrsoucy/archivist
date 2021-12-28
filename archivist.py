@@ -34,8 +34,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 
-## email
+## notifications
 import smtplib
+import http.client
+import urllib
 
 ## Amazon S3
 import boto3
@@ -45,6 +47,7 @@ class Archivist:
     # attributes with methods
     mode = None
     email = None
+    notify = None
     uuid = None
     success = 0
     failure = 0
@@ -57,6 +60,8 @@ class Archivist:
         Archivist.mode = mode
     def setEmail(email):
         Archivist.email = email
+    def setNotify(notify):
+        Archivist.notify = notify
     def setUUID(uuid):
         Archivist.uuid = uuid
     def recSuccess():
@@ -81,6 +86,7 @@ def parse_args():
     parser.add_argument("-m", "--mode", choices = ['test', 'prod'], required = True, help = "Run mode: prod or test")
     parser.add_argument("--uuid", nargs = '+', required = False, help = "Specify UUIDs of individual datasets to download")
     parser.add_argument("--no-email", required = False, action = "store_false", dest = "email", help = "If present, no email will be produced at the end of the run.")
+    parser.add_argument("--no-notify", required = False, action = "store_false", dest = "notify", help = "If present, no notification will be produced at the end of a prod run. Ignored during test runs.")
     args = parser.parse_args()
     
     # set run mode
@@ -94,6 +100,16 @@ def parse_args():
     else:
         print('No email will be sent at the end of this run.')
     
+    # set notification mode
+    if Archivist.mode == 'prod':
+        Archivist.setNotify(args.notify)
+        if Archivist.notify:
+            print('A notification will be sent at the end of this run.')
+        else:
+            print('No notification will be sent at the end of this run.')
+    else:
+        Archivist.setNotify(False) 
+
     # report datasets to be downloaded
     Archivist.setUUID(args.uuid)
     if Archivist.uuid:
@@ -652,6 +668,54 @@ Subject: %s
     except Exception as e:
         print(e)
         print('Message failed to send.')
+
+def pushover(message, priority=0, title=None, device=None):
+    """Send notification to device via the Pushover API (https://pushover.net/api).
+    
+    Parameters:
+    message (str): The body of the noficiation.
+    priority (int): Optional. Message priority, an integer from -2 to 2, see: https://pushover.net/api#priority). Defaults to 0 (normal priority).
+    title (str): Optional. The title of the notification. If None (the default), the application's name will be used.
+    device (str): Optional. The name of the device to send the notification to. If None (the default), the notification will be sent to all devices.
+    """
+
+    # load Pushover configuration
+    app_token = os.environ['PO_TOKEN']
+    user_key = os.environ['PO_KEY']
+
+    # assemble body
+    body = {
+        'token': app_token,
+        'user': user_key,
+        'message': message,
+        'priority': priority,
+        'title': title,
+        'device': device
+    }
+
+    # remove unused parameters
+    if (title is None):
+        body.pop('title')
+    if (device is None):
+        body.pop('device')
+    
+    # encode body
+    body_enc = urllib.parse.urlencode(body)
+
+    # send notification
+    conn = http.client.HTTPSConnection('api.pushover.net:443')
+    conn.request('POST', '/1/messages.json', body_enc, { 'Content-type': 'application/x-www-form-urlencoded' })
+    status = conn.getresponse().status
+
+    # check response
+    if (status == 200):
+        print('Notification sent successfully.')
+    else:
+        print('Status: ' + str(status))
+        print('Notification did not send successfully.')
+    
+    # close connection
+    conn.close()
 
 ## indexing
 
