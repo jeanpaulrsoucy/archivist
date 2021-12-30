@@ -176,7 +176,7 @@ def print_success_failure():
     print(background('Failed downloads: ' + str(Archivist.failure) + '/' + total_files, Colors.red))
 
 def generate_rerun_code():
-    code = 'The following code will rerun failed datasets:\n' + 'python archiver.py -m ' + Archivist.mode + ' --uuid ' + ' '.join(Archivist.failure_uuid)
+    code = 'The following code will rerun failed datasets:\n' + 'python archiver.py ' + Archivist.path_to_datasets_json + ' -m ' + Archivist.mode + ' --uuid ' + ' '.join(Archivist.failure_uuid)
     return code
 
 def find_url(search_url, regex, base_url):
