@@ -46,6 +46,8 @@ import boto3
 # define classes
 class Archivist:
     # attributes with methods
+    path_to_datasets_json = None
+    ds = None
     mode = None
     email = None
     notify = None
@@ -58,6 +60,10 @@ class Archivist:
     s3 = None
     debug = {'print_md5': False}
     # define methods
+    def setPathToDatasetsJSON(path):
+        Archivist.path_to_datasets_json = path
+    def setDS(ds):
+        Archivist.ds = ds
     def setMode(mode):
         Archivist.mode = mode
     def setEmail(email):
@@ -92,8 +98,46 @@ def parse_args():
     parser.add_argument("--no-email", required = False, action = "store_false", dest = "email", help = "If present, no email will be produced at the end of the run.")
     parser.add_argument("--no-notify", required = False, action = "store_false", dest = "notify", help = "If present, no notification will be produced at the end of a prod run. Ignored during test runs.")
     parser.add_argument("-d", "--debug", nargs = '+', choices = ['print-md5'], required = False, help = "Optional debug parameters")
+    parser.add_argument('path_to_datasets_json')
     args = parser.parse_args()
     
+    # set path to datasets.json
+    Archivist.setPathToDatasetsJSON(args.path_to_datasets_json)
+
+    # process list of datasets
+    # open file and subset active datasets
+    with open(Archivist.path_to_datasets_json) as json_file:
+      datasets = json.load(json_file)
+      datasets = datasets['active']
+    # convert datasets into single dictionary
+    ds = {}
+    for d in datasets:
+        for i in range(len(datasets[d])):
+            ds[datasets[d][i]['uuid']] = datasets[d][i]
+    # set datasets to be downloaded
+    if args.uuid:
+        # remove duplicates, preserving order
+        uuid = list(dict.fromkeys(args.uuid))
+        # print specified UUIDs
+        print('Specified datasets: ', ', '.join(uuid))
+        # remove invalid UUIDs
+        invalid = list(set(uuid) - set(list(ds.keys())))
+        if len(invalid) > 0:
+            for i in invalid:
+                uuid.remove(i)
+            print('Removed invalid UUIDs: ' + ', '.join(invalid))
+        Archivist.setUUID(uuid)
+        # subset dataset list
+        if len(Archivist.uuid) > 0:
+            ds = {key: ds[key] for key in Archivist.uuid}
+        else:
+            sys.exit("No valid UUIDs specified. Exiting.")
+    else:
+        print('No datasets specified. Downloading all datasets...')
+    # set final dataset list
+    Archivist.setDS(ds)
+    
+
     # set run mode
     Archivist.setMode(args.mode)
     print('Run mode set to ' + Archivist.mode + '.')
@@ -121,13 +165,6 @@ def parse_args():
             if (i == 'print-md5'):
                 Archivist.setDebugMD5()
                 print('DEBUG: MD5 hashes will be printed for each dataset')
-
-    # report datasets to be downloaded
-    Archivist.setUUID(args.uuid)
-    if Archivist.uuid:
-        print('Specified datasets: ', ', '.join(Archivist.uuid))
-    else:
-        print('No datasets specified. Downloading all datasets...')
 
 def get_datetime(tz):
     t = datetime.now(pytz.timezone(tz))
