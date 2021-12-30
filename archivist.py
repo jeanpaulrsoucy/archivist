@@ -52,6 +52,7 @@ class Archivist:
     email = None
     notify = None
     uuid = None
+    uuid_exclude = None
     success = 0
     failure = 0
     failure_uuid = []
@@ -72,6 +73,8 @@ class Archivist:
         Archivist.notify = notify
     def setUUID(uuid):
         Archivist.uuid = uuid
+    def setUUIDExclude(uuid_exclude):
+        Archivist.uuid_exclude = uuid_exclude
     def recSuccess():
         Archivist.success += 1
     def recFailure(uuid):
@@ -95,6 +98,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--mode", choices = ['test', 'prod'], required = True, help = "Run mode: prod or test")
     parser.add_argument("--uuid", nargs = '+', required = False, help = "Specify UUIDs of individual datasets to download")
+    parser.add_argument("--uuid-exclude", nargs = '+', required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
     parser.add_argument("--no-email", required = False, action = "store_false", dest = "email", help = "If present, no email will be produced at the end of the run.")
     parser.add_argument("--no-notify", required = False, action = "store_false", dest = "notify", help = "If present, no notification will be produced at the end of a prod run. Ignored during test runs.")
     parser.add_argument("-d", "--debug", nargs = '+', choices = ['print-md5'], required = False, help = "Optional debug parameters")
@@ -116,6 +120,9 @@ def parse_args():
             ds[datasets[d][i]['uuid']] = datasets[d][i]
     # set datasets to be downloaded
     if args.uuid:
+        # ignore --uuid-exclude, if present
+        if (args.uuid_exclude):
+            print('Ignoring --uuid-exclude, as --uuid is set.')
         # remove duplicates, preserving order
         uuid = list(dict.fromkeys(args.uuid))
         # print specified UUIDs
@@ -132,11 +139,28 @@ def parse_args():
             ds = {key: ds[key] for key in Archivist.uuid}
         else:
             sys.exit("No valid UUIDs specified. Exiting.")
+    elif args.uuid_exclude:
+        # remove duplicates, preserving order
+        uuid_exclude = list(dict.fromkeys(args.uuid_exclude))
+        # print specified UUIDs
+        print('Downloading all datasets except the following: ', ', '.join(uuid_exclude))
+        invalid = list(set(uuid_exclude) - set(list(ds.keys())))
+        if len(invalid) > 0:
+            for i in invalid:
+                uuid_exclude.remove(i)
+            print('Removed invalid UUIDs from exclusion list: ' + ', '.join(invalid))
+        Archivist.setUUIDExclude(uuid_exclude)
+        # subset dataset list
+        if len(Archivist.uuid_exclude) > 0:
+            for i in Archivist.uuid_exclude:
+                ds.pop(i)
     else:
         print('No datasets specified. Downloading all datasets...')
+    # verify dataset list is not empty
+    if len(ds) == 0:
+        sys.exit("No valid UUIDs specified. Exiting.")
     # set final dataset list
     Archivist.setDS(ds)
-    
 
     # set run mode
     Archivist.setMode(args.mode)
