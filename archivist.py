@@ -17,6 +17,7 @@ import tempfile
 import csv
 import json
 from zipfile import ZipFile
+import hashlib
 from array import *
 
 ## other utilities
@@ -55,6 +56,7 @@ class Archivist:
     log = ''
     prefix_root = None
     s3 = None
+    debug = {'print_md5': False}
     # define methods
     def setMode(mode):
         Archivist.mode = mode
@@ -75,6 +77,8 @@ class Archivist:
         Archivist.s3 = s3
     def setPrefixRoot(prefix_root):
         Archivist.prefix_root = prefix_root
+    def setDebugMD5():
+        Archivist.debug['print_md5'] = True
 
 # define functions
 
@@ -87,6 +91,7 @@ def parse_args():
     parser.add_argument("--uuid", nargs = '+', required = False, help = "Specify UUIDs of individual datasets to download")
     parser.add_argument("--no-email", required = False, action = "store_false", dest = "email", help = "If present, no email will be produced at the end of the run.")
     parser.add_argument("--no-notify", required = False, action = "store_false", dest = "notify", help = "If present, no notification will be produced at the end of a prod run. Ignored during test runs.")
+    parser.add_argument("-d", "--debug", nargs = '+', choices = ['print-md5'], required = False, help = "Optional debug parameters")
     args = parser.parse_args()
     
     # set run mode
@@ -108,7 +113,14 @@ def parse_args():
         else:
             print('No notification will be sent at the end of this run.')
     else:
-        Archivist.setNotify(False) 
+        Archivist.setNotify(False)
+    
+    # set debug parameters
+    if args.debug is not None:
+        for i in args.debug:
+            if (i == 'print-md5'):
+                Archivist.setDebugMD5()
+                print('DEBUG: MD5 hashes will be printed for each dataset')
 
     # report datasets to be downloaded
     Archivist.setUUID(args.uuid)
@@ -269,7 +281,7 @@ def upload_log(log):
 
 ## functions for web scraping
 
-def dl_file(url, dir_parent, dir_file, file, ext, uuid, user=False, rand_url=False, verify=True, unzip=False, ab_json_to_csv=False, mb_json_to_csv=False):
+def dl_file(url, dir_parent, dir_file, file, ext, uuid, user=False, rand_url=False, verify=True, unzip=False, ab_json_to_csv=False, mb_json_to_csv=False, debug=Archivist.debug):
     """Download file (generic).
 
     Used to download most file types (when Selenium is not required). Some files are handled with file-specific code:
@@ -291,6 +303,7 @@ def dl_file(url, dir_parent, dir_file, file, ext, uuid, user=False, rand_url=Fal
     unzip (bool): If True, this file requires unzipping. Default: False.
     ab_json_to_csv (bool): If True, this is an Alberta JSON file embedded in a webpage that should be converted to CSV. Default: False.
     mb_json_to_csv (bool): If True, this is a Manitoba JSON file that that should be converted to CSV. Default: False.
+    debug (dict): Debug parameters.
 
     """
 
@@ -323,77 +336,81 @@ def dl_file(url, dir_parent, dir_file, file, ext, uuid, user=False, rand_url=Fal
             Archivist.recFailure(uuid)
             ## write failure to log message
             Archivist.logEntry('Failure: ' + full_name + '\n')
-        ## successful request: if mode == test, print success and end
-        elif Archivist.mode == 'test':
-            ## print success and write to log
-            Archivist.logEntry('Success: ' + full_name + '\n')
-            print(color('Test download successful: ' + full_name, Colors.green))
-            Archivist.recSuccess()
-        ## successful request: mode == prod, upload file
         else:
-            if unzip:
-                ## unzip data
-                tmpdir = tempfile.TemporaryDirectory()
-                zpath = os.path.join(tmpdir.name, 'zip_file.zip')
-                with open(zpath, mode='wb') as local_file:
-                    local_file.write(req.content)                        
-                with ZipFile(zpath, 'r') as zip_file:
-                    zip_file.extractall(tmpdir.name)
-                f_path = os.path.join(tmpdir.name, file + ext)
-                if file == '13100781':
-                    ## read CSV (informative columns only)
-                    data = pd.read_csv(f_path, usecols=['REF_DATE', 'Case identifier number', 'Case information', 'VALUE'])
-                    ## save original order of column values
-                    col_order = data['Case information'].unique()
-                    ## pivot long to wide
-                    data = data.pivot(index=['REF_DATE', 'Case identifier number'], columns='Case information', values='VALUE').reset_index()
-                    ## use original column order
-                    data = data[['REF_DATE', 'Case identifier number'] + col_order.tolist()]
-                    ## write CSV
-                    data.to_csv(f_path, index=None, quoting=csv.QUOTE_NONNUMERIC)
-            elif ab_json_to_csv:
-                ## for Alberta JSON data only: extract JSON from webpage, convert JSON to CSV and save as temporary file                    
-                tmpdir = tempfile.TemporaryDirectory()
-                f_path = os.path.join(tmpdir.name, file + ext)
-                data = re.search("(?<=\"data\"\:)\[\[.*\]\]", req.text).group(0)
-                if url == "https://www.alberta.ca/maps/covid-19-status-map.htm":
-                    data = BeautifulSoup(data, features="html.parser")
-                    data = data.get_text() # strip HTML tags
-                    ## this regex may need some tweaking if measures column changes in the future
-                    data = re.sub("<\\\/a><\\\/li><\\\/ul>", "", data) # strip remaining tags
-                    data = re.sub("(?<=\") ", "", data) # strip whitespace
-                    data = re.sub(" (?=\")", "", data) # strip whitespace
-                    data = pd.read_json(data).transpose()
-                    data = data.rename(columns={0: "", 1: "Region name", 2: "Measures", 3: "Active case rate (per 100,000 population)", 4: "Active cases", 5: "Population"})
-                elif url == "https://www.alberta.ca/schools/covid-19-school-status-map.htm":
-                    data = re.sub(',"container":.*', "", data) # strip remaining tags
-                    data = pd.read_json(data).transpose()
-                    data = data.rename(columns={0: "", 1: "Region name", 2: "School status", 3: "Schools details", 4: "num_ord"})
-                    data['num_ord'] = data['num_ord'].astype(str).astype(int) # convert to int
-                    data[''] = data[''].astype(str).astype(int) # convert to int
-                    data = data.sort_values(by=['num_ord', '']) # sort ascending by num_ord and first column (like CSV output on website)
-                data = data.to_csv(None, quoting=csv.QUOTE_ALL, index=False) # to match website output: quote all lines, don't terminate with new line
-                with open(f_path, 'w') as local_file:
-                    local_file.write(data[:-1])
-            elif mb_json_to_csv:
-                ## for Manitoba JSON data only: convert JSON to CSV and save as temporary file                    
-                tmpdir = tempfile.TemporaryDirectory()
-                f_path = os.path.join(tmpdir.name, file + ext)
-                data = pd.json_normalize(json.loads(req.content)['features'])
-                data.columns = data.columns.str.lstrip('attributes.') # strip prefix
-                ## replace timestamps with actual dates
-                if 'Date' in data.columns:
-                    data.Date = pd.to_datetime(data.Date / 1000, unit='s').dt.date
-                data.to_csv(f_path, index=None)
+            # DEBUG: print md5 hash of dataset
+            if Archivist.debug['print_md5']:
+                print('md5: ' + hashlib.md5(req.content).hexdigest())
+            ## successful request: if mode == test, print success and end
+            if Archivist.mode == 'test':
+                ## print success and write to log
+                Archivist.logEntry('Success: ' + full_name + '\n')
+                print(color('Test download successful: ' + full_name, Colors.green))
+                Archivist.recSuccess()
+            ## successful request: mode == prod, upload file
             else:
-                ## all other data: write contents to temporary file
-                tmpdir = tempfile.TemporaryDirectory()
-                f_path = os.path.join(tmpdir.name, file + ext)
-                with open(f_path, mode='wb') as local_file:
-                    local_file.write(req.content)
-            ## upload file
-            s3_dir = os.path.join(dir_parent, dir_file)
-            upload_file(full_name, f_path, uuid, s3_dir=s3_dir, s3_prefix=Archivist.prefix_root)
+                if unzip:
+                    ## unzip data
+                    tmpdir = tempfile.TemporaryDirectory()
+                    zpath = os.path.join(tmpdir.name, 'zip_file.zip')
+                    with open(zpath, mode='wb') as local_file:
+                        local_file.write(req.content)                        
+                    with ZipFile(zpath, 'r') as zip_file:
+                        zip_file.extractall(tmpdir.name)
+                    f_path = os.path.join(tmpdir.name, file + ext)
+                    if file == '13100781':
+                        ## read CSV (informative columns only)
+                        data = pd.read_csv(f_path, usecols=['REF_DATE', 'Case identifier number', 'Case information', 'VALUE'])
+                        ## save original order of column values
+                        col_order = data['Case information'].unique()
+                        ## pivot long to wide
+                        data = data.pivot(index=['REF_DATE', 'Case identifier number'], columns='Case information', values='VALUE').reset_index()
+                        ## use original column order
+                        data = data[['REF_DATE', 'Case identifier number'] + col_order.tolist()]
+                        ## write CSV
+                        data.to_csv(f_path, index=None, quoting=csv.QUOTE_NONNUMERIC)
+                elif ab_json_to_csv:
+                    ## for Alberta JSON data only: extract JSON from webpage, convert JSON to CSV and save as temporary file                    
+                    tmpdir = tempfile.TemporaryDirectory()
+                    f_path = os.path.join(tmpdir.name, file + ext)
+                    data = re.search("(?<=\"data\"\:)\[\[.*\]\]", req.text).group(0)
+                    if url == "https://www.alberta.ca/maps/covid-19-status-map.htm":
+                        data = BeautifulSoup(data, features="html.parser")
+                        data = data.get_text() # strip HTML tags
+                        ## this regex may need some tweaking if measures column changes in the future
+                        data = re.sub("<\\\/a><\\\/li><\\\/ul>", "", data) # strip remaining tags
+                        data = re.sub("(?<=\") ", "", data) # strip whitespace
+                        data = re.sub(" (?=\")", "", data) # strip whitespace
+                        data = pd.read_json(data).transpose()
+                        data = data.rename(columns={0: "", 1: "Region name", 2: "Measures", 3: "Active case rate (per 100,000 population)", 4: "Active cases", 5: "Population"})
+                    elif url == "https://www.alberta.ca/schools/covid-19-school-status-map.htm":
+                        data = re.sub(',"container":.*', "", data) # strip remaining tags
+                        data = pd.read_json(data).transpose()
+                        data = data.rename(columns={0: "", 1: "Region name", 2: "School status", 3: "Schools details", 4: "num_ord"})
+                        data['num_ord'] = data['num_ord'].astype(str).astype(int) # convert to int
+                        data[''] = data[''].astype(str).astype(int) # convert to int
+                        data = data.sort_values(by=['num_ord', '']) # sort ascending by num_ord and first column (like CSV output on website)
+                    data = data.to_csv(None, quoting=csv.QUOTE_ALL, index=False) # to match website output: quote all lines, don't terminate with new line
+                    with open(f_path, 'w') as local_file:
+                        local_file.write(data[:-1])
+                elif mb_json_to_csv:
+                    ## for Manitoba JSON data only: convert JSON to CSV and save as temporary file                    
+                    tmpdir = tempfile.TemporaryDirectory()
+                    f_path = os.path.join(tmpdir.name, file + ext)
+                    data = pd.json_normalize(json.loads(req.content)['features'])
+                    data.columns = data.columns.str.lstrip('attributes.') # strip prefix
+                    ## replace timestamps with actual dates
+                    if 'Date' in data.columns:
+                        data.Date = pd.to_datetime(data.Date / 1000, unit='s').dt.date
+                    data.to_csv(f_path, index=None)
+                else:
+                    ## all other data: write contents to temporary file
+                    tmpdir = tempfile.TemporaryDirectory()
+                    f_path = os.path.join(tmpdir.name, file + ext)
+                    with open(f_path, mode='wb') as local_file:
+                        local_file.write(req.content)
+                ## upload file
+                s3_dir = os.path.join(dir_parent, dir_file)
+                upload_file(full_name, f_path, uuid, s3_dir=s3_dir, s3_prefix=Archivist.prefix_root)
     except Exception as e:
         ## print failure
         print(e)
@@ -434,7 +451,7 @@ def click_linktext(driver, wait, text):
     element.click()
     return driver
 
-def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, wait=None):
+def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, wait=None, debug=Archivist.debug):
     """Save HTML of a webpage.
 
     Parameters:
@@ -446,6 +463,7 @@ def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, 
     user (bool): Should the request impersonate a normal browser? Needed to access some data. Default: False.
     js (bool): Is the HTML source rendered by JavaScript?
     wait (int): Used only if js = True. Time in seconds that the function should wait for the page to render. If the time is too short, the source code may not be captured.
+    debug (dict): Debug parameters.
 
     """
     
@@ -510,6 +528,10 @@ def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, 
         f_path = os.path.join(tmpdir.name, file + ext)
         if js:
             time.sleep(wait) # complete page load
+        # DEBUG: print md5 hash of dataset
+        if Archivist.debug['print_md5']:
+            print('md5: ' + hashlib.md5(driver.page_source.encode('utf-8')).hexdigest())
+        # save HTML source
         with open(f_path, 'w') as local_file:
             local_file.write(driver.page_source)
 
@@ -542,7 +564,7 @@ def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, 
         ## write failure to log message
         Archivist.logEntry('Failure: ' + full_name + '\n')
 
-def ss_page(url, dir_parent, dir_file, file, ext, uuid, user=False, wait=5, width=None, height=None):
+def ss_page(url, dir_parent, dir_file, file, ext, uuid, user=False, wait=5, width=None, height=None, debug=Archivist.debug):
     """Take a screenshot of a webpage.
 
     By default, Selenium attempts to capture the entire page.
@@ -557,6 +579,7 @@ def ss_page(url, dir_parent, dir_file, file, ext, uuid, user=False, wait=5, widt
     wait (int): Time in seconds that the function should wait. Should be > 0 to ensure the entire page is captured.
     width (int): Width of the output screenshot. Default: None. If not set, the function attempts to detect the maximum width.
     height (int): Height of the output screenshot. Default: None. If not set, the function attempts to detect the maximum height.
+    debug (dict): Debug parameters.
 
     """
 
@@ -599,15 +622,19 @@ def ss_page(url, dir_parent, dir_file, file, ext, uuid, user=False, wait=5, widt
                 ## write failure to log message if mode == prod
                 if Archivist.mode == 'prod':
                     Archivist.logEntry('Failure: ' + full_name + '\n')
-            elif Archivist.mode == 'test':
-                ## print success and write to log
-                Archivist.logEntry('Success: ' + full_name + '\n')
-                print(color('Test download successful: ' + full_name, Colors.green))
-                Archivist.recSuccess()
             else:
-                ## upload file
-                s3_dir = os.path.join(dir_parent, dir_file)
-                upload_file(full_name, f_path, uuid, s3_dir=s3_dir, s3_prefix=Archivist.prefix_root)
+                # DEBUG: print md5 hash of dataset
+                if Archivist.debug['print_md5']:
+                    print('md5: ' + hashlib.md5(open(f_path, 'rb').read()).hexdigest())
+                if Archivist.mode == 'test':
+                    ## print success and write to log
+                    Archivist.logEntry('Success: ' + full_name + '\n')
+                    print(color('Test download successful: ' + full_name, Colors.green))
+                    Archivist.recSuccess()
+                else:
+                    ## upload file
+                    s3_dir = os.path.join(dir_parent, dir_file)
+                    upload_file(full_name, f_path, uuid, s3_dir=s3_dir, s3_prefix=Archivist.prefix_root)
         except Exception as e:
             ## print exception
             print(e)
