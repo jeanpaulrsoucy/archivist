@@ -286,7 +286,7 @@ def output_log(log, t):
     total_files = str(Archivist.success + Archivist.failure)
 
     ## assemble log
-    log = 'Successful downloads : ' + str(Archivist.success) + '/' + total_files + '\n' + 'Failed downloads: ' + str(Archivist.failure) + '/' + total_files + '\n' + log + '\n'
+    log = 'Successful downloads: ' + str(Archivist.success) + '/' + total_files + '\n' + 'Failed downloads: ' + str(Archivist.failure) + '/' + total_files + '\n' + log + '\n'
     if Archivist.failure > 0:
         log = log + '\n' + generate_rerun_code()
     log = t.strftime("%Y-%m-%d %H:%M") + '\n\n' + log
