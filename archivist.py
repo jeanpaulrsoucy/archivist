@@ -553,18 +553,15 @@ def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, 
                 # wait for tab link to be clickable then click
                 driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[1]/a')
                 driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[1]/ul/li[2]/a')
-            elif uuid == '66fbe91e-34c0-4f7f-aa94-cf6c14db0158':
-                # wait for tab link to be clickable then click
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[2]/a')
                 # time.sleep(wait); driver.find_element_by_id('complete').get_attribute('innerHTML') # test
             elif uuid == '391d177d-1ea8-45ac-bca4-d9f86733c253':
                 # wait for tab link to be clickable then click
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/a')
+                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[2]/a')
                 # time.sleep(wait); driver.find_element_by_id('Title2').get_attribute('innerHTML') # test
             elif uuid == 'effdfd82-7c59-4f49-8445-f1f8f73b6dc2':
                 # wait for tab link to be clickable then click
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[4]/a')
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[4]/ul/li[1]/a')
+                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/a')
+                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/ul/li[1]/a')
                 # whole population coverage
                 driver = click_xpath(driver, wait, '//*[@id="all"]')
                 # show all data tables
@@ -574,8 +571,8 @@ def html_page(url, dir_parent, dir_file, file, ext, uuid, user=False, js=False, 
                 # time.sleep(wait); driver.find_element_by_id('VCTitle2').get_attribute('innerHTML') # test
             elif uuid == '454de458-f7b4-4814-96a6-5a426f8c8c60':
                 # wait for tab link to be clickable then click
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[4]/a')
-                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[4]/ul/li[2]/a')
+                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/a')
+                driver = click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/ul/li[2]/a')
                 # time.sleep(wait); driver.find_element_by_id('VCTitle').get_attribute('innerHTML') # test
             elif uuid == 'e00e2148-b0ea-458b-9f00-3533e0c5ae8e':
                 # wait for tab link to be clickable then click
