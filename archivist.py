@@ -200,7 +200,8 @@ class Archivist:
             if len(invalid) > 0:
                 for i in invalid:
                     self.options["uuid"].remove(i)
-            print("Removed invalid UUIDs: " + ", ".join(invalid))
+                # report removed UUIDs
+                print("Removed invalid UUIDs: " + ", ".join(invalid))
             # subset dataset list
             if len(self.options["uuid"]) > 0:
                 ds = {key: ds[key] for key in self.options["uuid"]}
