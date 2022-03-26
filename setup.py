@@ -3,8 +3,9 @@ from setuptools import find_packages, setup
 setup(
     name='archivist',
     py_modules=['archivist'],
+    url='https://github.com/jeanpaulrsoucy/archivist',
     packages=find_packages(),
-    version='0.1.0',
+    version='0.2.0',
     description='Python-based digital archive tool currently powering the Canadian COVID-19 Data Archive.',
     author='Jean-Paul R. Soucy',
     author_email="<jeanpaul.r.soucy@gmail.com>",
