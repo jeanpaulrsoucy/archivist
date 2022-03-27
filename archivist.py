@@ -526,7 +526,7 @@ class downloader:
         # download function
         uuid_info["dl_fun"] = d["dl_fun"]
         # use dl_file instead of html_page for simple HTML pages (pages not requiring JS)
-        if ["dl_fun"] == "html_page":
+        if uuid_info["dl_fun"] == "html_page":
             if "js" in uuid_info["args"]:
                 if uuid_info["args"]["js"] is False:
                     uuid_info["dl_fun"] = "dl_file"
