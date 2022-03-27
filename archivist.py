@@ -243,6 +243,8 @@ class Archivist:
             code += " --email"
         if self.log_options["notify"]:
             code += " --notify"
+        if self.log_options["upload-log"]:
+            code += " --upload-log"
         if self.debug_options["print_md5"]:
             code += " --debug print-md5"
         # add failed UUIDs
@@ -273,11 +275,10 @@ class Archivist:
         # return log
         return log
     
-    def upload_log(self):
+    def upload_log(self, log):
         print("Uploading recent log...")
         try:
             # write most recent log entry temporarily and upload
-            log = self.log["log"]
             tmpdir = tempfile.TemporaryDirectory()
             f_path = os.path.join(tmpdir.name, 'log.txt')
             with open(f_path, "w") as local_file:
@@ -1004,7 +1005,7 @@ if __name__ == '__main__':
             # send pushover notification
             if a.log_options["notify"]:
                 # compose notification
-                notif = "Success: " + str(a.log["success"] + "\nFailure: " + str(a.log["failure"]))
+                notif = "Success: " + str(a.log["success"]) + "\nFailure: " + str(a.log["failure"])
                 pushover(notif, priority=1, title = "Archive update completed")
         else:
             # email log (if there are any failures)
