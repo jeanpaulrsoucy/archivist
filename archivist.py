@@ -52,6 +52,7 @@ from colorit import *
 ## web scraping
 import requests
 from selenium import webdriver # requires ChromeDriver and Chromium/Chrome
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -702,7 +703,8 @@ class downloader:
         options.add_experimental_option('prefs', prefs)
         if user:
             options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0")
-        driver = webdriver.Chrome(executable_path=os.environ['CHROMEDRIVER_BIN'], options=options)
+        chromedriver_service = Service(os.environ['CHROMEDRIVER_BIN'])
+        driver = webdriver.Chrome(service=chromedriver_service, options=options)
         return driver
 
     def click_xpath(self, driver, wait, xpath):
@@ -762,7 +764,7 @@ class downloader:
                     # whole population coverage
                     driver = self.click_xpath(driver, wait, '//*[@id="all"]')
                     # show all data tables
-                    elements = driver.find_elements_by_link_text('Data Table')
+                    elements = driver.find_elements(by=By.LINK_TEXT, value = 'Data Table')
                     for element in elements:
                         element.click()
                     # time.sleep(wait); driver.find_element_by_id('VCTitle2').get_attribute('innerHTML') # test
