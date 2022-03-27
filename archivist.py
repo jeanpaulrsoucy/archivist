@@ -541,8 +541,13 @@ class downloader:
         return uuid_info
     
     def print_md5(self, f_content):
-        print('md5: ' + hashlib.md5(f_content).hexdigest())
-    
+        try:
+            print("md5: " + hashlib.md5(f_content).hexdigest())
+        except Exception as e:
+            # print error message
+            print(e)
+            # print failure to produce hash
+            print("md5: failed to hash dataset")
     def upload_file(self, f_name, f_path, uuid):
         # generate full S3 key
         f_key = os.path.join(a.s3["bucket_root"], f_name)
