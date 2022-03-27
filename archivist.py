@@ -616,7 +616,7 @@ class downloader:
                 # DEBUG: print md5 hash of dataset
                 if a.debug_options["print_md5"]:
                     if html:
-                        self.print_md5(req.content.encode("utf-8"))
+                        self.print_md5(req.text.encode("utf-8"))
                     else:
                         self.print_md5(req.content)
                 # successful request: if mode == test, print success and end
