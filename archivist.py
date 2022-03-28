@@ -244,7 +244,7 @@ class Archivist:
             code += " --email"
         if self.log_options["notify"]:
             code += " --notify"
-        if self.log_options["upload-log"]:
+        if self.log_options["upload_log"]:
             code += " --upload-log"
         if self.debug_options["print_md5"]:
             code += " --debug print-md5"
