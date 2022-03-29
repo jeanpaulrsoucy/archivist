@@ -72,7 +72,7 @@ def arg_parser():
     # initialize parser and add arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices = ["test", "prod", "index"], help = "Run mode: prod, test, index")
-    parser.add_argument("path_to_datasets_json", help = "The path to the JSON file containing dataset information")
+    parser.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
     parser.add_argument("-o", "--out_path", nargs = None, required = False, help = "Where to write the output file (if any)")
     parser.add_argument("-u", "--uuid", nargs = "+", required = False, help = "Specify UUIDs of individual datasets to download")
     parser.add_argument("-x", "--uuid-exclude", nargs = "+", required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
@@ -103,7 +103,7 @@ class Archivist:
         self.t = get_datetime().strftime("%Y-%m-%d %H:%M") # record start time
         self.options = {
             "mode": args.mode,
-            "path_to_datasets_json": args.path_to_datasets_json,
+            "project_dir": args.project_dir,
             "out_path": args.out_path,
             "uuid": args.uuid,
             "uuid_exclude": args.uuid_exclude
@@ -122,7 +122,7 @@ class Archivist:
         self.debug_options = {
             "print_md5": True if "print-md5" in args.debug else False
         }
-        with open(self.options["path_to_datasets_json"]) as json_file:
+        with open(os.path.join(self.options["project_dir"], "datasets.json")) as json_file:
             self.ds_raw = json.load(json_file)
         self.ds = self.load_ds() # load active datasets for this run
         if (self.options["mode"] != "test"):
@@ -238,7 +238,7 @@ class Archivist:
 
     def generate_rerun_code(self):
         # base code
-        code = "python -m archivist " + self.options["mode"] + " " + self.options["path_to_datasets_json"]
+        code = "python -m archivist " + self.options["mode"] + " " + self.options["project_dir"]
         # get options
         if self.log_options["email"]:
             code += " --email"
