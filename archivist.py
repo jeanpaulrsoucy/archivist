@@ -496,6 +496,8 @@ class downloader:
                 print(e)
                 # report failure
                 print(background(uuid + ": Failed to retrieve URL", Colors.red))
+                # write error to URL (failure will be handled by the dl_fun)
+                uuid_info["url"] = "ERROR"
         else:
             raise Exception(uuid + ": Neither a URL nor a URL function are given, skipping...")
         # get ID name and report
