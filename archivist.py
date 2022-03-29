@@ -511,8 +511,7 @@ class downloader:
         # process bool args
         bool_args = [
             "user", "rand_url", "verify",
-            "unzip", "js",
-            "ab_json_to_csv", "mb_json_to_csv"
+            "unzip", "js"
             ]
         for k, v in d["args"].items():
             if k in bool_args:
@@ -585,8 +584,6 @@ class downloader:
         user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
         rand_url = uuid_info["args"]["rand_url"] if "rand_url" in uuid_info["args"] else False
         unzip = uuid_info["args"]["unzip"] if "unzip" in uuid_info["args"] else False
-        ab_json_to_csv = uuid_info["args"]["ab_json_to_csv"] if "ab_json_to_csv" in uuid_info["args"] else False
-        mb_json_to_csv = uuid_info["args"]["mb_json_to_csv"] if "mb_json_to_csv" in uuid_info["args"] else False
 
         # temporary file name
         tmpdir = tempfile.TemporaryDirectory()
@@ -631,49 +628,9 @@ class downloader:
                         # unzip data
                         z_path = os.path.join(tmpdir.name, "zip_file.zip")
                         with open(z_path, mode="wb") as local_file:
-                            local_file.write(req.content)                        
+                            local_file.write(req.content)
                         with ZipFile(z_path, "r") as zip_file:
                             zip_file.extractall(tmpdir.name)
-                        if uuid == "7a1c4441-b27c-4b3d-a9b6-71a9c24da95d":
-                            # read CSV (informative columns only)
-                            data = pd.read_csv(f_path, usecols=['REF_DATE', 'Case identifier number', 'Case information', 'VALUE'])
-                            # save original order of column values
-                            col_order = data['Case information'].unique()
-                            # pivot long to wide
-                            data = data.pivot(index=['REF_DATE', 'Case identifier number'], columns='Case information', values='VALUE').reset_index()
-                            # use original column order
-                            data = data[['REF_DATE', 'Case identifier number'] + col_order.tolist()]
-                            # write CSV
-                            data.to_csv(f_path, index=None, quoting=csv.QUOTE_NONNUMERIC)
-                    elif ab_json_to_csv:
-                        data = re.search("(?<=\"data\"\:)\[\[.*\]\]", req.text).group(0)
-                        if url == "https://www.alberta.ca/maps/covid-19-status-map.htm":
-                            data = BeautifulSoup(data, features="html.parser")
-                            data = data.get_text() # strip HTML tags
-                            # this regex may need some tweaking if measures column changes in the future
-                            data = re.sub("<\\\/a><\\\/li><\\\/ul>", "", data) # strip remaining tags
-                            data = re.sub("(?<=\") ", "", data) # strip whitespace
-                            data = re.sub(" (?=\")", "", data) # strip whitespace
-                            data = pd.read_json(data).transpose()
-                            data = data.rename(columns={0: "", 1: "Region name", 2: "Measures", 3: "Active case rate (per 100,000 population)", 4: "Active cases", 5: "Population"})
-                        elif url == "https://www.alberta.ca/schools/covid-19-school-status-map.htm":
-                            data = re.sub(',"container":.*', "", data) # strip remaining tags
-                            data = pd.read_json(data).transpose()
-                            data = data.rename(columns={0: "", 1: "Region name", 2: "School status", 3: "Schools details", 4: "num_ord"})
-                            data['num_ord'] = data['num_ord'].astype(str).astype(int) # convert to int
-                            data[''] = data[''].astype(str).astype(int) # convert to int
-                            data = data.sort_values(by=['num_ord', '']) # sort ascending by num_ord and first column (like CSV output on website)
-                        data = data.to_csv(None, quoting=csv.QUOTE_ALL, index=False) # to match website output: quote all lines, don't terminate with new line
-                        with open(f_path, 'w') as local_file:
-                            local_file.write(data[:-1])
-                    elif mb_json_to_csv:
-                        # for Manitoba JSON data only: convert JSON to CSV and save as temporary file                    
-                        data = pd.json_normalize(json.loads(req.content)['features'])
-                        data.columns = data.columns.str.lstrip('attributes.') # strip prefix
-                        # replace timestamps with actual dates
-                        if 'Date' in data.columns:
-                            data.Date = pd.to_datetime(data.Date / 1000, unit='s').dt.date
-                        data.to_csv(f_path, index=None)
                     else:
                         # all other data: write contents to temporary file
                         with open(f_path, mode="wb") as local_file:
