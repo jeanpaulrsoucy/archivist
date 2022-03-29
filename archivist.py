@@ -625,7 +625,7 @@ class downloader:
                     a.record_success(f_name)
                 # successful request: mode == prod, upload file
                 else:
-                    # special processing
+                    # unzip file, if required
                     if unzip:
                         # unzip data
                         z_path = os.path.join(tmpdir.name, "zip_file.zip")
@@ -701,47 +701,18 @@ class downloader:
             driver = self.load_webdriver(tmpdir, user=user)
             # load page
             driver.get(url)
-            # special processing
-            try:
-                if uuid == '9ed0f5cd-2c45-40a1-94c9-25b0c9df8f48':
-                    # show other figure in tabset
-                    time.sleep(wait) # allow first figure to load
-                    driver = self.click_linktext(driver, wait, 'Tests by Specimen Collection Date') # ID is dynamic
-                elif uuid == '8814f932-33ec-49ef-896d-d1779b2abea7':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[1]/a')
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[1]/ul/li[2]/a')
-                    # time.sleep(wait); driver.find_element_by_id('complete').get_attribute('innerHTML') # test
-                elif uuid == '391d177d-1ea8-45ac-bca4-d9f86733c253':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[2]/a')
-                    # time.sleep(wait); driver.find_element_by_id('Title2').get_attribute('innerHTML') # test
-                elif uuid == 'effdfd82-7c59-4f49-8445-f1f8f73b6dc2':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/a')
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/ul/li[1]/a')
-                    # whole population coverage
-                    driver = self.click_xpath(driver, wait, '//*[@id="all"]')
-                    # show all data tables
-                    elements = driver.find_elements(by=By.LINK_TEXT, value = 'Data Table')
-                    for element in elements:
-                        element.click()
-                    # time.sleep(wait); driver.find_element_by_id('VCTitle2').get_attribute('innerHTML') # test
-                elif uuid == '454de458-f7b4-4814-96a6-5a426f8c8c60':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/a')
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/nav/div/ul/li[3]/ul/li[2]/a')
-                    # time.sleep(wait); driver.find_element_by_id('VCTitle').get_attribute('innerHTML') # test
-                elif uuid == 'b32a2f6b-7745-4bb1-9f9b-7ad0000d98a0':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/report-embed/div/div/div[1]/div/div/div/exploration-container/div/div/div/exploration-host/div/div/exploration/div/explore-canvas/div/div[2]/div/div[2]/div[2]/visual-container-repeat/visual-container[4]/transform/div/div[3]/div/visual-modern')
-                elif uuid == 'e00e2148-b0ea-458b-9f00-3533e0c5ae8e':
-                    # wait for tab link to be clickable then click
-                    driver = self.click_xpath(driver, wait, '/html/body/div[1]/report-embed/div/div/div[1]/div/div/div/exploration-container/div/div/div/exploration-host/div/div/exploration/div/explore-canvas/div/div[2]/div/div[2]/div[2]/visual-container-repeat/visual-container-group[2]/transform/div/div[2]/visual-container[3]/transform/div/div[3]/div/visual-modern')
-            # print error message
-            except Exception as e:
-                print(e)
-            
+            # run special processing code, if required
+            proc_webdriver_path = os.path.join(a.options["project_dir"], "proc", "webdriver", uuid + ".py")
+            if os.path.exists(proc_webdriver_path):
+                try:
+                    # run code in current namespace
+                    proc_webdriver_code = open(proc_webdriver_path)
+                    exec(proc_webdriver_code.read())
+                    proc_webdriver_code.close()
+                # print error message
+                except Exception as e:
+                    print(e)
+                    print("Error in special processing code for webdriver: " + uuid)
             # save HTML of webpage
             time.sleep(wait) # complete page load
             page_source = driver.page_source
@@ -751,7 +722,6 @@ class downloader:
             # save HTML file
             with open(f_path, "w") as local_file:
                 local_file.write(page_source)
-
             # verify download
             if not os.path.isfile(f_path):
                 # record failure
