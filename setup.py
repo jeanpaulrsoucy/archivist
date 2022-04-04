@@ -14,5 +14,5 @@ setup(
     author='Jean-Paul R. Soucy',
     author_email="<jeanpaul.r.soucy@gmail.com>",
     license='MIT',
-    install_requires=['boto3', 'color-it', 'pandas', 'pytz', 'requests', 'selenium'],
+    install_requires=['boto3', 'color-it', 'humanfriendly', 'pandas', 'pytz', 'requests', 'selenium'],
 )

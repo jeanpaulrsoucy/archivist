@@ -5,6 +5,7 @@ from datetime import datetime
 import tempfile
 from zipfile import ZipFile
 import hashlib
+from humanfriendly import parse_size, format_size
 from colorit import *
 import requests
 from selenium import webdriver # requires ChromeDriver and Chromium/Chrome
@@ -43,7 +44,10 @@ class Downloader:
 
     def arg_int(self, k, v):
         try:
-            return(int(v))
+            if k == "min_size":
+                return parse_size(v)
+            else:
+                return(int(v))
         except:
             print("Error interpreting arg " + k + ", setting value to 0.")
             return 0
@@ -95,7 +99,7 @@ class Downloader:
                 uuid_info["args"][k] = self.arg_bool(k, v)
         # process int args
         int_args = [
-            "wait", "width", "height"
+            "wait", "min_size", "width", "height"
             ]
         for k, v in d["args"].items():
             if k in int_args:
@@ -161,6 +165,7 @@ class Downloader:
         user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
         rand_url = uuid_info["args"]["rand_url"] if "rand_url" in uuid_info["args"] else False
         unzip = uuid_info["args"]["unzip"] if "unzip" in uuid_info["args"] else False
+        min_size = uuid_info["args"]["min_size"] if "min_size" in uuid_info["args"] else False
 
         # temporary file name
         tmpdir = tempfile.TemporaryDirectory()
@@ -188,6 +193,13 @@ class Downloader:
                 # record failure
                 a.record_failure(f_name, uuid)
             else:
+                # check if page source is above minimum expected size
+                if html and min_size:
+                    if len(req.text.encode("utf-8")) < min_size:
+                        # record failure
+                        a.record_failure(f_name, uuid)
+                        # raise exception
+                        raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
                 # DEBUG: print md5 hash of dataset
                 if a.debug_options["print_md5"]:
                     if html:
@@ -269,6 +281,7 @@ class Downloader:
         # set default parameters
         user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
         wait = uuid_info["args"]["wait"] if "wait" in uuid_info["args"] else 0
+        min_size = uuid_info["args"]["min_size"] if "min_size" in uuid_info["args"] else False
 
         # download file
         try:
@@ -287,10 +300,17 @@ class Downloader:
                 # print error message
                 except Exception as e:
                     print(e)
-                    print("Error in special processing code for webdriver: " + uuid)
+                    raise Exception("Error in special processing code for webdriver: " + uuid)
             # save HTML of webpage
             time.sleep(wait) # complete page load
             page_source = driver.page_source
+            # check if page source is above minimum expected size
+            if min_size:
+                if len(page_source.encode("utf-8")) < min_size:
+                    # record failure
+                    a.record_failure(f_name, uuid)
+                    # raise exception
+                    raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
             # DEBUG: print md5 hash of dataset
             if a.debug_options["print_md5"]:
                 self.print_md5(page_source.encode("utf-8"))
