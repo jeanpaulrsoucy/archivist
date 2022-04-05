@@ -1,6 +1,5 @@
 # import modules
 import os
-import time
 from datetime import datetime
 import tempfile
 from zipfile import ZipFile
@@ -8,15 +7,10 @@ import hashlib
 from humanfriendly import parse_size, format_size
 from colorit import *
 import requests
-from selenium import webdriver # requires ChromeDriver and Chromium/Chrome
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 
 # import classes
 from archivist.classes.Archivist import Archivist as a
+from archivist.classes.Webdriver import Webdriver
 
 # import functions
 from archivist.utils.common import get_datetime
@@ -231,39 +225,6 @@ class Downloader:
             print(e)
             # record failure
             a.record_failure(f_name, uuid)
-    
-    def load_webdriver(self, tmpdir, user=False):
-        """Load Chromium headless webdriver for Selenium.
-
-        Parameters:
-        tmpdir (TemporaryDirectory): A temporary directory for saving files downloaded by the headless browser.
-        user (bool): Should the request impersonate a normal browser? Needed to access some data. Default: False.
-        """
-        options = Options()
-        options.binary_location = os.environ['CHROME_BIN']
-        options.add_argument("--headless")
-        options.add_argument("--start-maximized")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--no-sandbox")
-        prefs = {'download.default_directory' : tmpdir.name}
-        options.add_experimental_option('prefs', prefs)
-        if user:
-            options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0")
-        chromedriver_service = Service(os.environ['CHROMEDRIVER_BIN'])
-        driver = webdriver.Chrome(service=chromedriver_service, options=options)
-        return driver
-
-    def click_xpath(self, driver, wait, xpath):
-        element = WebDriverWait(driver, timeout=wait).until(
-            EC.element_to_be_clickable((By.XPATH, xpath)))
-        element.click()
-        return driver
-
-    def click_linktext(self, driver, wait, text):
-        element = WebDriverWait(driver, timeout=wait).until(
-            EC.element_to_be_clickable((By.LINK_TEXT, text)))
-        element.click()
-        return driver
 
     def html_page(self, uuid_info):
 
@@ -279,31 +240,15 @@ class Downloader:
         f_path = os.path.join(tmpdir.name, uuid_info["file_name"] + uuid_info["file_ext"])
 
         # set default parameters
-        user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
+        # user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
         wait = uuid_info["args"]["wait"] if "wait" in uuid_info["args"] else 0
         min_size = uuid_info["args"]["min_size"] if "min_size" in uuid_info["args"] else False
 
         # download file
         try:
-            # load webdriver
-            driver = self.load_webdriver(tmpdir, user=user)
-            # load page
-            driver.get(url)
-            # run special processing code, if required
-            proc_webdriver_path = os.path.join(a.options["project_dir"], "proc", "webdriver", uuid + ".py")
-            if os.path.exists(proc_webdriver_path):
-                try:
-                    # run code in current namespace
-                    proc_webdriver_code = open(proc_webdriver_path)
-                    exec(proc_webdriver_code.read())
-                    proc_webdriver_code.close()
-                # print error message
-                except Exception as e:
-                    print(e)
-                    raise Exception("Error in special processing code for webdriver: " + uuid)
-            # save HTML of webpage
-            time.sleep(wait) # complete page load
-            page_source = driver.page_source
+            # load page and get source
+            driver = Webdriver(tmpdir, uuid, url, wait)
+            page_source = driver.page_source()
             # check if page source is above minimum expected size
             if min_size:
                 if len(page_source.encode("utf-8")) < min_size:
