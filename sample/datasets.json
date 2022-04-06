@@ -1,0 +1,56 @@
+{
+  "active": {
+    "can": [
+      {
+        "id_name": "",
+        "uuid": "",
+        "active": "True",
+        "url": "",
+        "dir_parent": "",
+        "dir_file": "",
+        "file_name": "",
+        "file_ext": "",
+        "dl_fun": "",
+        "args": {},
+        "supplementary": {},
+        "metadata": {
+          "meta_name": "",
+          "meta_url": "",
+          "meta_url_name": "",
+          "meta_licence": "",
+          "meta_licence_url": "",
+          "meta_group_1": "",
+          "meta_group_2": ""
+        },
+        "notes": {}
+      }
+    ]
+  },
+  "inactive": {
+    "can": [
+      {
+        "id_name": "",
+        "uuid": "",
+        "active": "False",
+        "url": "",
+        "dir_parent": "",
+        "dir_file": "",
+        "file_name": "",
+        "file_ext": "",
+        "dl_fun": "",
+        "args": {},
+        "supplementary": {},
+        "metadata": {
+          "meta_name": "",
+          "meta_url": "",
+          "meta_url_name": "",
+          "meta_licence": "",
+          "meta_licence_url": "",
+          "meta_group_1": "",
+          "meta_group_2": ""
+        },
+        "notes": {}
+      }
+    ]
+  }
+}
