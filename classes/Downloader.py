@@ -252,8 +252,6 @@ class Downloader:
             # check if page source is above minimum expected size
             if min_size:
                 if len(page_source.encode("utf-8")) < min_size:
-                    # record failure
-                    a.record_failure(f_name, uuid)
                     # raise exception
                     raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
             # DEBUG: print md5 hash of dataset
@@ -264,8 +262,8 @@ class Downloader:
                 local_file.write(page_source)
             # verify download
             if not os.path.isfile(f_path):
-                # record failure
-                a.record_failure(f_name, uuid)
+                # raise exception
+                raise Exception("File not found")
             # successful request: if mode == test, print success and end
             elif a.options["mode"] == "test":
                 # record success
