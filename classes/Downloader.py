@@ -184,42 +184,39 @@ class Downloader:
 
             ## check if request was successful
             if not req.ok:
-                # record failure
-                a.record_failure(f_name, uuid)
-            else:
-                # check if page source is above minimum expected size
-                if html and min_size:
-                    if len(req.text.encode("utf-8")) < min_size:
-                        # record failure
-                        a.record_failure(f_name, uuid)
-                        # raise exception
-                        raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
-                # DEBUG: print md5 hash of dataset
-                if a.debug_options["print_md5"]:
-                    if html:
-                        self.print_md5(req.text.encode("utf-8"))
-                    else:
-                        self.print_md5(req.content)
-                # successful request: if mode == test, print success and end
-                if a.options["mode"] == "test":
-                    # record success
-                    a.record_success(f_name)
-                # successful request: mode == prod, upload file
+                # raise exception
+                raise Exception("Request failed")
+            # check if page source is above minimum expected size
+            if html and min_size:
+                if len(req.text.encode("utf-8")) < min_size:
+                    # raise exception
+                    raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
+            # DEBUG: print md5 hash of dataset
+            if a.debug_options["print_md5"]:
+                if html:
+                    self.print_md5(req.text.encode("utf-8"))
                 else:
-                    # unzip file, if required
-                    if unzip:
-                        # unzip data
-                        z_path = os.path.join(tmpdir.name, "zip_file.zip")
-                        with open(z_path, mode="wb") as local_file:
-                            local_file.write(req.content)
-                        with ZipFile(z_path, "r") as zip_file:
-                            zip_file.extractall(tmpdir.name)
-                    else:
-                        # all other data: write contents to temporary file
-                        with open(f_path, mode="wb") as local_file:
-                            local_file.write(req.content)
-                    # upload file
-                    self.upload_file(f_name, f_path, uuid)
+                    self.print_md5(req.content)
+            # successful request: if mode == test, print success and end
+            if a.options["mode"] == "test":
+                # record success
+                a.record_success(f_name)
+            # successful request: mode == prod, upload file
+            else:
+                # unzip file, if required
+                if unzip:
+                    # unzip data
+                    z_path = os.path.join(tmpdir.name, "zip_file.zip")
+                    with open(z_path, mode="wb") as local_file:
+                        local_file.write(req.content)
+                    with ZipFile(z_path, "r") as zip_file:
+                        zip_file.extractall(tmpdir.name)
+                else:
+                    # all other data: write contents to temporary file
+                    with open(f_path, mode="wb") as local_file:
+                        local_file.write(req.content)
+                # upload file
+                self.upload_file(f_name, f_path, uuid)
         except Exception as e:
             # print error message
             print(e)
