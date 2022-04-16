@@ -24,6 +24,7 @@ def arg_parser():
     parser.add_argument("-m", "--email", required = False, action = "store_true", dest = "email", help = "If present, an email will be sent at the end of the run (ignored for test runs with no errors)")
     parser.add_argument("-n", "--notify", required = False, action = "store_true", dest = "notify", help = "If present, a Pushover notification will be sent at the end of a prod run (prod only)")
     parser.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
+    parser.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5"], required = False, help = "Optional debug parameters")
     # parse args
     args = parser.parse_args()
@@ -45,7 +46,8 @@ class Archivist:
             "project_dir": args.project_dir,
             "out_path": args.out_path,
             "uuid": args.uuid,
-            "uuid_exclude": args.uuid_exclude
+            "uuid_exclude": args.uuid_exclude,
+            "allow_inactive": args.allow_inactive
         }
         self.log = {
             "log": "",
@@ -119,13 +121,21 @@ class Archivist:
             sys.exit("Failed to connect to S3 bucket.")
 
     def load_ds(self):
-        # load active datasets
-        datasets = self.ds_raw["active"]
-        # convert datasets into a single dictionary
+        # load datasets and convert to single dictionary
         ds = {}
-        for d in datasets:
-            for i in range(len(datasets[d])):
-                ds[datasets[d][i]['uuid']] = datasets[d][i]
+        if (self.options["allow_inactive"]):
+            # active and inactive datasets
+            datasets = self.ds_raw
+            for a in datasets:
+                for d in datasets[a].keys():
+                    for i in range(len(datasets[a][d])):
+                        ds[datasets[a][d][i]['uuid']] = datasets[a][d][i]
+        else:
+            # active datasets only
+            datasets = self.ds_raw["active"]
+            for d in datasets:
+                for i in range(len(datasets[d])):
+                    ds[datasets[d][i]['uuid']] = datasets[d][i]
         # set datasets to be downloaded
         if self.options["uuid"]:
             # ignore --uuid-exclude, if present

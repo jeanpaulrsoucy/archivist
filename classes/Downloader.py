@@ -50,7 +50,7 @@ class Downloader:
         d = a.ds[uuid]
         uuid_info = {"uuid": uuid}
         # verify dataset is active
-        if d["active"] != "True":
+        if a.options["allow_inactive"] is not True and d["active"] != "True":
             raise Exception(uuid + ": Dataset is marked as inactive, skipping...")
         # get URL
         if "url" in d:
