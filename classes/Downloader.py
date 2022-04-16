@@ -1,6 +1,7 @@
 # import modules
 import os
 from datetime import datetime
+import time
 import tempfile
 from zipfile import ZipFile
 import hashlib
@@ -20,6 +21,8 @@ class Downloader:
     def __init__(self, uuid):
         # get UUID info
         self.uuid_info = self.get_dataset_info(uuid)
+        # wait before beginning download (0 seconds by default)
+        time.sleep(a.config["downloading"]["wait_before_downloads"])
         # begin download
         self.dl_fun(self.uuid_info)
     
