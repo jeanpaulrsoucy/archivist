@@ -46,6 +46,8 @@ from archivist.messenger.pushover import pushover
 from archivist.utils.common import get_datetime
 
 # run module as script
+a.t = get_datetime().strftime("%Y-%m-%d %H:%M:%S %Z") # record start time
+print("Start time: " + a.t) # announce start time
 if a.options["mode"] == "prod" or a.options["mode"] == "test":
     # announce beginning of file downloads
     print('Beginning file downloads...')

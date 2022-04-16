@@ -2,15 +2,13 @@
 import argparse
 import os
 import json
+import toml
 import tempfile
 from datetime import timedelta
 from colorit import *
 import pandas as pd
 import numpy as np 
 import boto3
-
-# import functions
-from archivist.utils.common import get_datetime
 
 # parse arguments
 def arg_parser():
@@ -40,7 +38,6 @@ class Archivist:
         # parse arguments
         args = arg_parser()
         # set attributes
-        self.t = get_datetime().strftime("%Y-%m-%d %H:%M") # record start time
         self.options = {
             "mode": args.mode,
             "project_dir": args.project_dir,
@@ -63,9 +60,14 @@ class Archivist:
         self.debug_options = {
             "print_md5": True if "print-md5" in args.debug else False
         }
+        # load config
+        with open(os.path.join(self.options["project_dir"], "config.toml")) as config_file:
+            self.config = toml.load(config_file)
+        # load data
         with open(os.path.join(self.options["project_dir"], "datasets.json")) as json_file:
             self.ds_raw = json.load(json_file)
-        self.ds = self.load_ds() # load active datasets for this run
+        self.ds = self.load_ds()
+        # connect to S3 bucket
         if (self.options["mode"] != "test"):
             self.s3 = {
                 "aws_id": os.environ["AWS_ID"],

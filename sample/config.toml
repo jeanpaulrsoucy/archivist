@@ -1,2 +1,3 @@
 [project]
 title = "Sample Project Title"
+tz = "America/Toronto"
