@@ -197,6 +197,8 @@ class Archivist:
             code += " --notify"
         if self.log_options["upload_log"]:
             code += " --upload-log"
+        if self.options["allow_inactive"]:
+            code += " --allow-inactive"
         if self.debug_options["print_md5"]:
             code += " --debug print-md5"
         # add failed UUIDs
