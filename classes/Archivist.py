@@ -192,6 +192,10 @@ class Archivist:
         total_files = str(self.log["success"] + self.log["failure"])
         print(background('Successful downloads: ' + str(self.log["success"]) + '/' + total_files, Colors.blue))
         print(background('Failed downloads: ' + str(self.log["failure"]) + '/' + total_files, Colors.red))
+    
+    def print_failed_uuids(self):
+        for i in self.log["failure_uuid"]:
+            print(i + ": " + self.ds[i]["id_name"])
 
     def generate_rerun_code(self):
         # base code
@@ -216,7 +220,6 @@ class Archivist:
             print("No failed UUIDs found. No rerun code will be generated.")
             return None
         # return rerun code
-        code = "The following code will rerun failed datasets:\n" + code
         return code
 
     def output_log(self):
