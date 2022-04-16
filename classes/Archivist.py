@@ -18,7 +18,7 @@ def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("mode", choices = ["test", "prod", "index"], help = "Run mode: prod, test, index")
     parser.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
-    parser.add_argument("-o", "--out_path", nargs = None, required = False, help = "Where to write the output file (if any)")
+    parser.add_argument("-o", "--out-path", nargs = None, required = False, help = "Where to write the output file (if any)")
     parser.add_argument("-u", "--uuid", nargs = "+", required = False, help = "Specify UUIDs of individual datasets to download")
     parser.add_argument("-x", "--uuid-exclude", nargs = "+", required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
     parser.add_argument("-m", "--email", required = False, action = "store_true", dest = "email", help = "If present, an email will be sent at the end of the run (ignored for test runs with no errors)")
