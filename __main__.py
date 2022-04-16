@@ -58,8 +58,9 @@ if a.options["mode"] == "prod" or a.options["mode"] == "test":
     a.print_success_failure()
     # print rerun code, if necessary
     if a.log["failure"] > 0:
-            print(background("\n" + a.generate_rerun_code(), (150, 150, 150)))
-            print("") # newline
+        # print to stderr
+        print("") # newline
+        print(a.generate_rerun_code(), file=sys.stderr)
     # assemble log
     log = a.output_log()
     if a.options["mode"] == "prod":
