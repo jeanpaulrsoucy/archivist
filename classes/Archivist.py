@@ -3,6 +3,7 @@ import argparse
 import os
 import json
 import toml
+import random
 import tempfile
 from datetime import timedelta
 from colorit import *
@@ -23,6 +24,7 @@ def arg_parser():
     parser.add_argument("-n", "--notify", required = False, action = "store_true", dest = "notify", help = "If present, a Pushover notification will be sent at the end of a prod run (prod only)")
     parser.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
     parser.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
+    parser.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
     parser.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5"], required = False, help = "Optional debug parameters")
     # parse args
     args = parser.parse_args()
@@ -44,7 +46,8 @@ class Archivist:
             "out_path": args.out_path,
             "uuid": args.uuid,
             "uuid_exclude": args.uuid_exclude,
-            "allow_inactive": args.allow_inactive
+            "allow_inactive": args.allow_inactive,
+            "random_order": args.random_order
         }
         self.log = {
             "log": "",
@@ -179,6 +182,9 @@ class Archivist:
         # verify dataset list is not empty
         if len(ds) == 0:
             sys.exit("No valid UUIDs specified. Exiting.")
+        # shuffle order of datasets, if specified
+        if self.options["random_order"]:
+            ds = {k: ds[k] for k in random.sample([*ds.keys()], len(ds))}
         # return dataset list
         return ds
     
@@ -199,6 +205,8 @@ class Archivist:
             code += " --upload-log"
         if self.options["allow_inactive"]:
             code += " --allow-inactive"
+        if self.options["random_order"]:
+            code += " --random-order"
         if self.debug_options["print_md5"]:
             code += " --debug print-md5"
         # add failed UUIDs
