@@ -82,7 +82,7 @@ if a.options["mode"] == "prod" or a.options["mode"] == "test":
         # send email
         if a.log_options["email"]:
             # compose email message
-            subject = " ".join(["PROD", "Covid19CanadaArchive Log", a.t + ",", "Failed:", str(a.log["failure"])])
+            subject = " ".join(["PROD", a.config["project"]["title"] ,"Log", a.t + ",", "Failed:", str(a.log["failure"])])
             body = log
             # email log
             send_email(subject, body)
@@ -90,13 +90,13 @@ if a.options["mode"] == "prod" or a.options["mode"] == "test":
         if a.log_options["notify"]:
             # compose notification
             notif = "Success: " + str(a.log["success"]) + "\nFailure: " + str(a.log["failure"])
-            pushover(notif, priority=1, title = "Archive update completed")
+            pushover(notif, priority=1, title = a.config["project"]["title"] + " update completed")
     else:
         # email log (if there are any failures)
         if a.log_options["email"]:
             if a.log["failure"] > 0:
                 # compose email message
-                subject = " ".join(["TEST", "Covid19CanadaArchive Log", a.t + ",", "Failed:", str(a.log["failure"])])
+                subject = " ".join(["TEST", a.config["project"]["title"] , "Log", a.t + ",", "Failed:", str(a.log["failure"])])
                 body = log
                 send_email(subject, body)
             else:
