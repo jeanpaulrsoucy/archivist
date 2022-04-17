@@ -19,6 +19,8 @@ from archivist.utils.common import get_datetime
 # define Downloader class
 class Downloader:
     def __init__(self, uuid):
+        # set retry count
+        self.retry = -1 # initial try sets count to 0
         # get UUID info
         self.uuid_info = self.get_dataset_info(uuid)
         # wait before beginning download (0 seconds by default)
@@ -55,6 +57,8 @@ class Downloader:
         # verify dataset is active
         if a.options["allow_inactive"] is not True and d["active"] != "True":
             raise Exception(uuid + ": Dataset is marked as inactive, skipping...")
+        # report ID name
+        print(d["id_name"])
         # get URL
         if "url" in d:
             uuid_info["url"] = d["url"]
@@ -76,10 +80,6 @@ class Downloader:
                 uuid_info["url"] = "ERROR"
         else:
             raise Exception(uuid + ": Neither a URL nor a URL function are given, skipping...")
-        # get ID name and report
-        id_name = d["id_name"]
-        uuid_info["id_name"] = id_name
-        print(id_name)
         # get file name, path and extension
         uuid_info["file_name"] = d["file_name"]
         uuid_info["file_path"] = os.path.join(d["dir_parent"], d["dir_file"], uuid_info["file_name"])
@@ -150,14 +150,24 @@ class Downloader:
         uuid = uuid_info["uuid"]
         # set file name with timestamp and file ext
         f_name = uuid_info["file_path"] + '_' + get_datetime().strftime('%Y-%m-%d_%H-%M') + uuid_info["file_ext"]
-        # pass info to appropriate download function
-        try:
-            getattr(self, dl_fun)(uuid_info, f_name)
-        except Exception as e:
-            # print error message
-            print(e)
-            # record failure
-            a.record_failure(f_name, uuid)
+        # begin download
+        while self.retry < a.config["downloading"]["max_retries"]:
+            try:
+                # announce retry
+                if self.retry >= 0:
+                    print(background("Retry " + str(self.retry + 1) + "/" + str(a.config["downloading"]["max_retries"]) + " for " + uuid, Colors.orange))
+                # download file
+                getattr(self, dl_fun)(uuid_info, f_name)
+                break # function ran without exceptions
+            except Exception as e:
+                # print error message
+                print(e)
+                # increment retry counter
+                self.retry += 1
+                # record failure if maximum retries reached
+                if self.retry == a.config["downloading"]["max_retries"]:
+                    # record failure
+                    a.record_failure(f_name, uuid)
 
     def dl_file(self, uuid_info, f_name):
         # set UUID and URL
