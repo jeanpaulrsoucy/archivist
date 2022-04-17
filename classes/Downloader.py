@@ -127,6 +127,7 @@ class Downloader:
             print(e)
             # print failure to produce hash
             print("md5: failed to hash dataset")
+    
     def upload_file(self, f_name, f_path, uuid):
         # generate full S3 key
         f_key = os.path.join(a.s3["bucket_root"], f_name)
@@ -145,16 +146,23 @@ class Downloader:
     def dl_fun(self, uuid_info):
         # get download function
         dl_fun = uuid_info["dl_fun"]
+        # set uuid
+        uuid = uuid_info["uuid"]
+        # set file name with timestamp and file ext
+        f_name = uuid_info["file_path"] + '_' + get_datetime().strftime('%Y-%m-%d_%H-%M') + uuid_info["file_ext"]
         # pass info to appropriate download function
-        getattr(self, dl_fun)(uuid_info)
+        try:
+            getattr(self, dl_fun)(uuid_info, f_name)
+        except Exception as e:
+            # print error message
+            print(e)
+            # record failure
+            a.record_failure(f_name, uuid)
 
-    def dl_file(self, uuid_info):
+    def dl_file(self, uuid_info, f_name):
         # set UUID and URL
         uuid = uuid_info["uuid"]
         url = uuid_info["url"]
-
-        # set name with timestamp and file ext
-        f_name = uuid_info["file_path"] + '_' + get_datetime().strftime('%Y-%m-%d_%H-%M') + uuid_info["file_ext"]
 
         # set default parameters
         html = True if uuid_info["file_ext"] == ".html" else False
@@ -169,71 +177,62 @@ class Downloader:
         f_path = os.path.join(tmpdir.name, uuid_info["file_name"] + uuid_info["file_ext"])
 
         # download file
-        try:
-            # add no-cache headers
-            headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
+        # add no-cache headers
+        headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
 
-            # set normal-looking user agent string, if user is set to True
-            # some websites will reject a request unless it appears to be a normal web browser
-            if user is True:
-                headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0"
+        # set normal-looking user agent string, if user is set to True
+        # some websites will reject a request unless it appears to be a normal web browser
+        if user is True:
+            headers["User-Agent"] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0"
 
-            # add random number to url to prevent caching, if requested
-            if rand_url is True:
-                url = url + "?randNum=" + str(int(datetime.now().timestamp()))
+        # add random number to url to prevent caching, if requested
+        if rand_url is True:
+            url = url + "?randNum=" + str(int(datetime.now().timestamp()))
 
-            # request URL
-            req = requests.get(url, headers=headers, verify=verify)
+        # request URL
+        req = requests.get(url, headers=headers, verify=verify)
 
-            ## check if request was successful
-            if not req.ok:
+        ## check if request was successful
+        if not req.ok:
+            # raise exception
+            raise Exception("Request failed")
+        # check if page source is above minimum expected size
+        if html and min_size:
+            if len(req.text.encode("utf-8")) < min_size:
                 # raise exception
-                raise Exception("Request failed")
-            # check if page source is above minimum expected size
-            if html and min_size:
-                if len(req.text.encode("utf-8")) < min_size:
-                    # raise exception
-                    raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
-            # DEBUG: print md5 hash of dataset
-            if a.debug_options["print_md5"]:
-                if html:
-                    self.print_md5(req.text.encode("utf-8"))
-                else:
-                    self.print_md5(req.content)
-            # successful request: if mode == test, print success and end
-            if a.options["mode"] == "test":
-                # record success
-                a.record_success(f_name)
-            # successful request: mode == prod, upload file
+                raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
+        # DEBUG: print md5 hash of dataset
+        if a.debug_options["print_md5"]:
+            if html:
+                self.print_md5(req.text.encode("utf-8"))
             else:
-                # unzip file, if required
-                if unzip:
-                    # unzip data
-                    z_path = os.path.join(tmpdir.name, "zip_file.zip")
-                    with open(z_path, mode="wb") as local_file:
-                        local_file.write(req.content)
-                    with ZipFile(z_path, "r") as zip_file:
-                        zip_file.extractall(tmpdir.name)
-                else:
-                    # all other data: write contents to temporary file
-                    with open(f_path, mode="wb") as local_file:
-                        local_file.write(req.content)
-                # upload file
-                self.upload_file(f_name, f_path, uuid)
-        except Exception as e:
-            # print error message
-            print(e)
-            # record failure
-            a.record_failure(f_name, uuid)
+                self.print_md5(req.content)
+        # successful request: if mode == test, print success and end
+        if a.options["mode"] == "test":
+            # record success
+            a.record_success(f_name)
+        # successful request: mode == prod, upload file
+        else:
+            # unzip file, if required
+            if unzip:
+                # unzip data
+                z_path = os.path.join(tmpdir.name, "zip_file.zip")
+                with open(z_path, mode="wb") as local_file:
+                    local_file.write(req.content)
+                with ZipFile(z_path, "r") as zip_file:
+                    zip_file.extractall(tmpdir.name)
+            else:
+                # all other data: write contents to temporary file
+                with open(f_path, mode="wb") as local_file:
+                    local_file.write(req.content)
+            # upload file
+            self.upload_file(f_name, f_path, uuid)
 
-    def html_page(self, uuid_info):
+    def html_page(self, uuid_info, f_name):
 
         # set UUID and URL
         uuid = uuid_info["uuid"]
         url = uuid_info["url"]
-
-        # set name with timestamp and file ext
-        f_name = uuid_info["file_path"] + '_' + get_datetime().strftime('%Y-%m-%d_%H-%M') + uuid_info["file_ext"]
         
         # temporary file name
         tmpdir = tempfile.TemporaryDirectory()
@@ -245,37 +244,31 @@ class Downloader:
         min_size = uuid_info["args"]["min_size"] if "min_size" in uuid_info["args"] else False
 
         # download file
-        try:
-            # load page and get source
-            driver = Webdriver(tmpdir, uuid, url, wait)
-            page_source = driver.page_source()
-            # check if page source is above minimum expected size
-            if min_size:
-                if len(page_source.encode("utf-8")) < min_size:
-                    # raise exception
-                    raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
-            # DEBUG: print md5 hash of dataset
-            if a.debug_options["print_md5"]:
-                self.print_md5(page_source.encode("utf-8"))
-            # save HTML file
-            with open(f_path, "w") as local_file:
-                local_file.write(page_source)
-            # verify download
-            if not os.path.isfile(f_path):
+        # load page and get source
+        driver = Webdriver(tmpdir, uuid, url, wait)
+        page_source = driver.page_source()
+        # check if page source is above minimum expected size
+        if min_size:
+            if len(page_source.encode("utf-8")) < min_size:
                 # raise exception
-                raise Exception("File not found")
-            # successful request: if mode == test, print success and end
-            elif a.options["mode"] == "test":
-                # record success
-                a.record_success(f_name)
-            # successful request: mode == prod, prepare files for data upload
-            else:
-                # upload file
-                self.upload_file(f_name, f_path, uuid)
-            # quit webdriver
-            driver.quit()
-        except Exception as e:
-            # print error message
-            print(e)
-            # record failure
-            a.record_failure(f_name, uuid)
+                raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
+        # DEBUG: print md5 hash of dataset
+        if a.debug_options["print_md5"]:
+            self.print_md5(page_source.encode("utf-8"))
+        # save HTML file
+        with open(f_path, "w") as local_file:
+            local_file.write(page_source)
+        # verify download
+        if not os.path.isfile(f_path):
+            # raise exception
+            raise Exception("File not found")
+        # successful request: if mode == test, print success and end
+        elif a.options["mode"] == "test":
+            # record success
+            a.record_success(f_name)
+        # successful request: mode == prod, prepare files for data upload
+        else:
+            # upload file
+            self.upload_file(f_name, f_path, uuid)
+        # quit webdriver
+        driver.quit()
