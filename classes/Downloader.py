@@ -182,6 +182,10 @@ class Downloader:
         unzip = uuid_info["args"]["unzip"] if "unzip" in uuid_info["args"] else False
         min_size = uuid_info["args"]["min_size"] if "min_size" in uuid_info["args"] else False
 
+        # DEBUG: override 'verify' parameter for requests
+        if a.debug_options["ignore_ssl"]:
+            verify = False
+
         # temporary file name
         tmpdir = tempfile.TemporaryDirectory()
         f_path = os.path.join(tmpdir.name, uuid_info["file_name"] + uuid_info["file_ext"])

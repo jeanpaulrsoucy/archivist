@@ -25,7 +25,7 @@ def arg_parser():
     parser.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
     parser.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
-    parser.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5"], required = False, help = "Optional debug parameters")
+    parser.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
     # parse args
     args = parser.parse_args()
     # add empty debug list, if necessary
@@ -60,8 +60,10 @@ class Archivist:
             "notify": True if args.notify else False,
             "upload_log": True if args.upload_log else False
         }
+        self.debug = args.debug # save copy of debug for generate_rerun_code()
         self.debug_options = {
-            "print_md5": True if "print-md5" in args.debug else False
+            "print_md5": True if "print-md5" in self.debug else False,
+            "ignore_ssl": True if "ignore-ssl" in self.debug else False
         }
         # load config
         with open(os.path.join(self.options["project_dir"], "config.toml")) as config_file:
@@ -211,8 +213,8 @@ class Archivist:
             code += " --allow-inactive"
         if self.options["random_order"]:
             code += " --random-order"
-        if self.debug_options["print_md5"]:
-            code += " --debug print-md5"
+        if len(self.debug) > 0:
+            code += " --debug " + " ".join(self.debug)
         # add failed UUIDs
         if len(self.log["failure_uuid"]) > 0:
             code += " --uuid " + " ".join(self.log["failure_uuid"])
