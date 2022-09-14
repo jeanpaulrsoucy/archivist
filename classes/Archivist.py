@@ -15,22 +15,37 @@ import boto3
 def arg_parser():
     # initialize parser and add arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices = ["test", "prod", "index"], help = "Run mode: prod, test, index")
-    parser.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
-    parser.add_argument("-o", "--out-path", nargs = None, required = False, help = "Where to write the output file (if any)")
-    parser.add_argument("-u", "--uuid", nargs = "+", required = False, help = "Specify UUIDs of individual datasets to download")
-    parser.add_argument("-x", "--uuid-exclude", nargs = "+", required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
-    parser.add_argument("-m", "--email", required = False, action = "store_true", dest = "email", help = "If present, an email will be sent at the end of the run (ignored for test runs with no errors)")
-    parser.add_argument("-n", "--notify", required = False, action = "store_true", dest = "notify", help = "If present, a Pushover notification will be sent at the end of a prod run (prod only)")
-    parser.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
-    parser.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
-    parser.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
-    parser.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
+    # add subparsers
+    subparsers = parser.add_subparsers(dest="mode")
+    # subparser for mode "prod"
+    parser_prod = subparsers.add_parser("prod")
+    parser_prod.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
+    parser_prod.add_argument("-u", "--uuid", nargs = "+", required = False, help = "Specify UUIDs of individual datasets to download")
+    parser_prod.add_argument("-x", "--uuid-exclude", nargs = "+", required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
+    parser_prod.add_argument("-m", "--email", required = False, action = "store_true", dest = "email", help = "If present, an email will be sent at the end of the run (ignored for test runs with no errors)")
+    parser_prod.add_argument("-n", "--notify", required = False, action = "store_true", dest = "notify", help = "If present, a Pushover notification will be sent at the end of a prod run (prod only)")
+    parser_prod.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
+    parser_prod.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
+    parser_prod.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
+    parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
+    # subparser for mode "test"
+    parser_test = subparsers.add_parser("test")
+    parser_test.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
+    parser_test.add_argument("-u", "--uuid", nargs = "+", required = False, help = "Specify UUIDs of individual datasets to download")
+    parser_test.add_argument("-x", "--uuid-exclude", nargs = "+", required = False, help = "Download all datasets except the specified datasets (ignored when --uuid is set)")
+    parser_test.add_argument("-m", "--email", required = False, action = "store_true", dest = "email", help = "If present, an email will be sent at the end of the run (ignored for test runs with no errors)")
+    parser_test.add_argument("-n", "--notify", required = False, action = "store_true", dest = "notify", help = "If present, a Pushover notification will be sent at the end of a prod run (prod only)")
+    parser_test.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
+    parser_test.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
+    parser_test.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
+    parser_test.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
+    # subparser for mode "index"
+    parser_index = subparsers.add_parser("index")
+    parser_index.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
+    parser_index.add_argument("-d", "--debug", nargs = "+", choices = [], required = False, help = "Optional debug parameters (none currently available)")
+    parser_index.add_argument("-o", "--out-path", nargs = None, required = False, help = "Output file name and path (if blank, default file name and path is used)")
     # parse args
     args = parser.parse_args()
-    # add empty debug list, if necessary
-    if args.debug is None:
-        args.debug = []
     # return parsed args
     return args
 
@@ -40,26 +55,40 @@ class Archivist:
         # parse arguments
         args = arg_parser()
         # set attributes
-        self.options = {
-            "mode": args.mode,
-            "project_dir": args.project_dir,
-            "out_path": args.out_path,
-            "uuid": args.uuid,
-            "uuid_exclude": args.uuid_exclude,
-            "allow_inactive": args.allow_inactive,
-            "random_order": args.random_order
-        }
-        self.log = {
-            "log": "",
-            "success": 0,
-            "failure": 0,
-            "failure_uuid": []
-        }
-        self.log_options = {
-            "email": True if args.email else False,
-            "notify": True if args.notify else False,
-            "upload_log": True if args.upload_log else False
-        }
+        # set options
+        if args.mode == "prod" or args.mode == "test":
+            self.options = {
+                "mode": args.mode,
+                "project_dir": args.project_dir,
+                "uuid": args.uuid,
+                "uuid_exclude": args.uuid_exclude,
+                "allow_inactive": args.allow_inactive,
+                "random_order": args.random_order
+            }
+        elif args.mode == "index":
+            self.options = {
+                "mode": args.mode,
+                "project_dir": args.project_dir,
+                "out_path": args.out_path
+            }
+        # set log options and initialize log (for prod and test modes)
+        if args.mode == "prod" or args.mode == "test":
+            self.log_options = {
+                "email": True if args.email else False,
+                "notify": True if args.notify else False,
+                "upload_log": True if args.upload_log else False
+            }
+            # initilize log
+            self.log = {
+                "log": "",
+                "success": 0,
+                "failure": 0,
+                "failure_uuid": []
+            }
+        # set debug options to empty list if not given
+        if args.debug is None:
+            args.debug = []
+        # set debug options
         self.debug = args.debug # save copy of debug for generate_rerun_code()
         self.debug_options = {
             "print_md5": True if "print-md5" in self.debug else False,
@@ -68,10 +97,12 @@ class Archivist:
         # load config
         with open(os.path.join(self.options["project_dir"], "config.toml")) as config_file:
             self.config = toml.load(config_file)
-        # load data
+        # load datasets.json
         with open(os.path.join(self.options["project_dir"], "datasets.json")) as json_file:
             self.ds_raw = json.load(json_file)
-        self.ds = self.load_ds()
+        # process datasets.json (for prod and test modes)
+        if self.options["mode"] == "prod" or self.options["mode"] == "test":
+            self.ds = self.load_ds()
         # connect to S3 bucket
         if (self.options["mode"] != "test"):
             self.s3 = {
