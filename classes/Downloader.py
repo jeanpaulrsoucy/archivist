@@ -8,6 +8,7 @@ import hashlib
 from humanfriendly import parse_size, format_size
 from colorit import *
 import requests
+import pandas as pd
 
 # import classes
 from archivist.classes.Archivist import Archivist as a
@@ -127,15 +128,49 @@ class Downloader:
             print(e)
             # print failure to produce hash
             print("md5: failed to hash dataset")
+    def index_entry(self, uuid, f_name, f_timestamp, f_path):
+        # get file size
+        f_size = os.path.getsize(f_path)
+        # get file md5
+        f_md5 = hashlib.md5(open(f_path, 'rb').read()).hexdigest()
+        # extract date and convert timestamp
+        tz = a.config["project"]["tz"]
+        f_timestamp = pd.to_datetime(f_timestamp, format='%Y-%m-%d_%H-%M').tz_localize(tz=tz)
+        f_date = str(f_timestamp.date())
+        f_timestamp = f_timestamp.value / 10**9
+        # check if file is a duplicate using db
+        db = a.index
+        query = db.execute("SELECT COUNT(*) FROM archive WHERE uuid = ? AND file_md5 = ? AND file_size = ?", (uuid, f_md5, f_size))
+        f_duplicate = 1 if query.fetchone()[0] > 0 else 0
+        # create index entry
+        f_index = {
+            "uuid": uuid,
+            "file_name": f_name,
+            "file_timestamp": f_timestamp,
+            "file_date": f_date,
+            "file_duplicate": f_duplicate,
+            "file_size": f_size,
+            "file_md5": f_md5
+            }
+        # return index entry
+        return f_index
     
-    def upload_file(self, f_name, f_path, uuid):
+    def insert_index(self, f_index):
+        # insert index entry into database
+        a.index["archive"].insert(f_index)
+    
+    def upload_file(self, f_name, f_path, uuid, f_index):
         # generate full S3 key
         f_key = os.path.join(a.s3["bucket_root"], f_name)
         # upload file to S3
         try:
             # upload file
-            a.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
-            # record success
+            if f_index["file_duplicate"] == 0:
+                a.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
+            else:
+                print("File is a duplicate. Skipping upload...")
+            # insert index entry and record success
+            self.insert_index(f_index)
             a.record_success(f_name)
         except Exception as e:
             # print error message
@@ -149,7 +184,8 @@ class Downloader:
         # set uuid
         uuid = uuid_info["uuid"]
         # set file name with timestamp and file ext
-        f_name = uuid_info["file_path"] + '_' + get_datetime().strftime('%Y-%m-%d_%H-%M') + uuid_info["file_ext"]
+        f_timestamp = get_datetime().strftime('%Y-%m-%d_%H-%M')
+        f_name = uuid_info["file_path"] + '_' + f_timestamp + uuid_info["file_ext"]
         # begin download
         while self.retry < a.config["downloading"]["max_retries"]:
             try:
@@ -157,7 +193,7 @@ class Downloader:
                 if self.retry >= 0:
                     print(background("Retry " + str(self.retry + 1) + "/" + str(a.config["downloading"]["max_retries"]) + " for " + uuid, Colors.orange))
                 # download file
-                getattr(self, dl_fun)(uuid_info, f_name)
+                getattr(self, dl_fun)(uuid_info, f_name, f_timestamp)
                 break # function ran without exceptions
             except Exception as e:
                 # print error message
@@ -169,7 +205,7 @@ class Downloader:
                     # record failure
                     a.record_failure(f_name, uuid)
 
-    def dl_file(self, uuid_info, f_name):
+    def dl_file(self, uuid_info, f_name, f_timestamp):
         # set UUID and URL
         uuid = uuid_info["uuid"]
         url = uuid_info["url"]
@@ -239,10 +275,12 @@ class Downloader:
                 # all other data: write contents to temporary file
                 with open(f_path, mode="wb") as local_file:
                     local_file.write(req.content)
-            # upload file
-            self.upload_file(f_name, f_path, uuid)
+            # prepare index entry
+            f_index = self.index_entry(uuid, f_name, f_timestamp, f_path)
+            # upload file if file is not a duplicate then insert index entry
+            self.upload_file(f_name, f_path, uuid, f_index)
 
-    def html_page(self, uuid_info, f_name):
+    def html_page(self, uuid_info, f_name, f_timestamp):
 
         # set UUID and URL
         uuid = uuid_info["uuid"]
@@ -282,7 +320,9 @@ class Downloader:
             a.record_success(f_name)
         # successful request: mode == prod, prepare files for data upload
         else:
-            # upload file
-            self.upload_file(f_name, f_path, uuid)
+            # prepare index entry
+            f_index = self.index_entry(uuid, f_name, f_timestamp, f_path)
+            # upload file if file is not a duplicate then insert index entry
+            self.upload_file(f_name, f_path, uuid, f_index)
         # quit webdriver
         driver.quit()

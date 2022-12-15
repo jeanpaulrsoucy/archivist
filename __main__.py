@@ -49,11 +49,48 @@ from archivist.utils.common import get_datetime
 a.t = get_datetime().strftime("%Y-%m-%d %H:%M:%S %Z") # record start time
 print("Start time: " + a.t) # announce start time
 if a.options["mode"] == "prod" or a.options["mode"] == "test":
+    # download index
+    if a.options["mode"] == "prod":
+        try:
+            a.download_index()
+        except Exception as e:
+            print(e)
+            print("ERROR: Index unavailable.")
+            if a.log_options["email"]:
+                # compose email message
+                subject = " ".join(["PROD", a.config["project"]["title"] ,"Log", a.t + ",", "Failed: index unavailable"])
+                body = ""
+                # email log
+                send_email(subject, body)
+            # send pushover notification
+            if a.log_options["notify"]:
+                # compose notification
+                notif = "Index unavailable"
+                pushover(notif, priority=1, title = a.config["project"]["title"] + " update failed")
+            sys.exit()
     # announce beginning of file downloads
     print('Beginning file downloads...')
     # loop through datasets
     for uuid in a.ds:
         Downloader(uuid)
+    # upload updated index
+    if a.options["mode"] == "prod":
+        try:
+            a.upload_index()
+        except Exception as e:
+            print(e)
+            print("ERROR: Index failed to upload.")
+            if a.log_options["email"]:
+                # compose email message
+                subject = " ".join(["PROD", a.config["project"]["title"] ,"Log", a.t + ",", "Failed: index failed to upload"])
+                body = ""
+                # email log
+                send_email(subject, body)
+            # send pushover notification
+            if a.log_options["notify"]:
+                # compose notification
+                notif = "Index failed to upload"
+                pushover(notif, priority=1, title = a.config["project"]["title"] + " update failed")
     # summarize successes and failures
     a.print_success_failure()
     # print rerun code, if necessary
@@ -105,5 +142,7 @@ if a.options["mode"] == "prod" or a.options["mode"] == "test":
 elif a.options["mode"] == "index":
     ind = a.create_index()
     a.write_index(ind, out_path=a.options["out_path"])
+elif a.options["mode"] == "initialize_index":
+    a.initialize_index(archive_dir = a.options["archive_dir"], out_path = a.options["out_path"])
 else:
     sys.exit("Please select a valid run mode.")
