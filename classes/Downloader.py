@@ -8,6 +8,8 @@ import hashlib
 from humanfriendly import parse_size, format_size
 from colorit import *
 import requests
+import urllib3
+import ssl
 import pandas as pd
 
 # import classes
@@ -90,7 +92,7 @@ class Downloader:
         # process bool args
         bool_args = [
             "user", "rand_url", "verify",
-            "unzip", "js"
+            "legacy_ssl", "unzip", "js"
             ]
         for k, v in d["args"].items():
             if k in bool_args:
@@ -213,6 +215,7 @@ class Downloader:
         # set default parameters
         html = True if uuid_info["file_ext"] == ".html" else False
         verify = uuid_info["args"]["verify"] if "verify" in uuid_info["args"] else True
+        legacy_ssl = uuid_info["args"]["legacy_ssl"] if "legacy_ssl" in uuid_info["args"] else False
         user = uuid_info["args"]["user"] if "user" in uuid_info["args"] else False
         rand_url = uuid_info["args"]["rand_url"] if "rand_url" in uuid_info["args"] else False
         unzip = uuid_info["args"]["unzip"] if "unzip" in uuid_info["args"] else False
@@ -240,7 +243,30 @@ class Downloader:
             url = url + "?randNum=" + str(int(datetime.now().timestamp()))
 
         # request URL
-        req = requests.get(url, headers=headers, verify=verify)
+        if legacy_ssl:
+            # workaround for unsafe_legacy_renegotiation error
+            # https://github.com/scrapy/scrapy/issues/5491#issuecomment-1241862323
+            class CustomHttpAdapter (requests.adapters.HTTPAdapter):
+                def __init__(self, ssl_context=None, **kwargs):
+                    self.ssl_context = ssl_context
+                    super().__init__(**kwargs)
+                def init_poolmanager(self, connections, maxsize, block=False):
+                    self.poolmanager = urllib3.poolmanager.PoolManager(
+                        num_pools=connections, maxsize=maxsize,
+                        block=block, ssl_context=self.ssl_context)
+            def get_legacy_session():
+                ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+                ctx.options |= 0x4  # OP_LEGACY_SERVER_CONNECT
+                session = requests.session()
+                session.mount('https://', CustomHttpAdapter(ctx))
+                return session
+            # make request
+            if (verify is False or a.debug_options["ignore_ssl"]):
+                # if verify is False, ge the following error: Cannot set verify_mode to CERT_NONE when check_hostname is enabled.
+                print("WARNING: Ignoring verify: False for legacy SSL request.")
+            req = get_legacy_session().get(url, headers=headers, verify=True)
+        else:
+            req = requests.get(url, headers=headers, verify=verify)
 
         ## check if request was successful
         if not req.ok:
