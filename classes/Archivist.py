@@ -29,7 +29,7 @@ def arg_parser():
     parser_prod.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
     parser_prod.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser_prod.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
-    parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
+    parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl", "no-upload"], required = False, help = "Optional debug parameters")
     # subparser for mode "test"
     parser_test = subparsers.add_parser("test")
     parser_test.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
@@ -97,7 +97,8 @@ class Archivist:
         self.debug = args.debug # save copy of debug for generate_rerun_code()
         self.debug_options = {
             "print_md5": True if "print-md5" in self.debug else False,
-            "ignore_ssl": True if "ignore-ssl" in self.debug else False
+            "ignore_ssl": True if "ignore-ssl" in self.debug else False,
+            "no_upload": True if "no-upload" in self.debug else False
         }
         # load config
         with open(os.path.join(self.options["project_dir"], "config.toml")) as config_file:
@@ -248,19 +249,22 @@ class Archivist:
             # delete local copy of index after successful upload
             os.remove(d_path)
         ## try to upload index up to 3 times
-        try:
-            upload_fun()
-        except Exception as e:
-            print(e)
-            print("Failed to upload index. Retrying in 1 minute...")
-            time.sleep(60)
+        if self.debug_options["no_upload"]:
+            print("DEBUG: Skipping index upload. Local copy of index will not be deleted.")
+        else:
             try:
                 upload_fun()
             except Exception as e:
                 print(e)
-                print("Failed to upload index. Retrying in 5 minutes...")
-                time.sleep(300)
-                upload_fun() # don't catch exception
+                print("Failed to upload index. Retrying in 1 minute...")
+                time.sleep(60)
+                try:
+                    upload_fun()
+                except Exception as e:
+                    print(e)
+                    print("Failed to upload index. Retrying in 5 minutes...")
+                    time.sleep(300)
+                    upload_fun() # don't catch exception
 
     def print_success_failure(self):
         total_files = str(self.log["success"] + self.log["failure"])
@@ -323,7 +327,10 @@ class Archivist:
             with open(f_path, "w") as local_file:
                 local_file.write(log)
             f_key = os.path.join(self.s3["bucket_root"], "log_recent.txt")
-            self.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
+            if self.debug_options["no_upload"]:
+                print("DEBUG: Skipping log upload.")
+            else:
+                self.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
             # report success
             print(color("Recent log upload successful!", Colors.green))
         except:
@@ -344,7 +351,10 @@ class Archivist:
             f_key = os.path.join(self.s3["bucket_root"], "log.txt")
             with open(f_path, "w") as local_file:
                 local_file.write(log)
-            self.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
+            if self.debug_options["no_upload"]:
+                print("DEBUG: Skipping log upload.")
+            else:
+                self.s3["bucket"].upload_file(Filename=f_path, Key=f_key)
             # report success
             print(color("Full log upload successful!", Colors.green))
         except:
