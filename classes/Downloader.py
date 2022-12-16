@@ -264,9 +264,9 @@ class Downloader:
             if (verify is False or a.debug_options["ignore_ssl"]):
                 # if verify is False, ge the following error: Cannot set verify_mode to CERT_NONE when check_hostname is enabled.
                 print("WARNING: Ignoring verify: False for legacy SSL request.")
-            req = get_legacy_session().get(url, headers=headers, verify=True)
+            req = get_legacy_session().get(url, headers=headers, verify=True, timeout=5)
         else:
-            req = requests.get(url, headers=headers, verify=verify)
+            req = requests.get(url, headers=headers, verify=verify, timeout=5)
 
         ## check if request was successful
         if not req.ok:
