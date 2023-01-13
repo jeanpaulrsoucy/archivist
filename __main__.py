@@ -98,9 +98,11 @@ if a.options["mode"] == "prod" or a.options["mode"] == "test":
         # print names of failed datasets
         print("\nFailed datasets:")
         a.print_failed_uuids()
-        # print to stderr
+        # print rerun code and then print to stderr with prefix "RERUN:"
         print("\nThe following code will rerun failed datasets:")
-        print(a.generate_rerun_code(), file=sys.stderr)
+        rerun_code = a.generate_rerun_code()
+        print(rerun_code)
+        print("RERUN:" + rerun_code, file=sys.stderr)
     # assemble log
     log = a.output_log()
     if a.options["mode"] == "prod":
