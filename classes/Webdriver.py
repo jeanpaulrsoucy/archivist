@@ -48,6 +48,11 @@ class Webdriver:
                 print(e)
                 raise Exception("Error in special processing code for webdriver: " + uuid)
     
+    def click_css(self, wait, css):
+        element = WebDriverWait(self.wd, timeout=wait).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, css)))
+        element.click()
+
     def click_xpath(self, wait, xpath):
         element = WebDriverWait(self.wd, timeout=wait).until(
             EC.element_to_be_clickable((By.XPATH, xpath)))
