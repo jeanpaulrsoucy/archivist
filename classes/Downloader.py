@@ -190,7 +190,7 @@ class Downloader:
         # set uuid
         uuid = uuid_info["uuid"]
         # set file name with timestamp and file ext
-        f_timestamp = get_datetime().strftime('%Y-%m-%d_%H-%M')
+        f_timestamp = get_datetime(ignore_fake_datetime=False).strftime('%Y-%m-%d_%H-%M')
         f_name = uuid_info["file_path"] + '_' + f_timestamp + uuid_info["file_ext"]
         f_name_index = uuid_info["file_name"] + '_' + f_timestamp + uuid_info["file_ext"]
         # begin download

@@ -29,6 +29,7 @@ def arg_parser():
     parser_prod.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
     parser_prod.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser_prod.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
+    parser_prod.add_argument("-t", "--fake-datetime", required = False, dest = "fake_datetime", help = "If present, the specified datetime will be used for all files instead of the current datetime (format: YYYY-MM-DD_HH-MM)")
     parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl", "no-upload"], required = False, help = "Optional debug parameters")
     # subparser for mode "test"
     parser_test = subparsers.add_parser("test")
@@ -40,6 +41,7 @@ def arg_parser():
     parser_test.add_argument("-l", "--upload-log", required = False, action = "store_true", dest = "upload_log", help = "If present, the log of the run will be uploaded to the S3 bucket (prod only)")
     parser_test.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser_test.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
+    parser_test.add_argument("-t", "--fake-datetime", required = False, dest = "fake_datetime", help = "If present, the specified datetime will be used for all files instead of the current datetime (format: YYYY-MM-DD_HH-MM)")
     parser_test.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
     # subparser for mode "initialize_index"
     parser_initialize_index = subparsers.add_parser("initialize_index")
@@ -66,8 +68,17 @@ class Archivist:
                 "uuid": args.uuid,
                 "uuid_exclude": args.uuid_exclude,
                 "allow_inactive": args.allow_inactive,
-                "random_order": args.random_order
+                "random_order": args.random_order,
+                "fake_datetime": args.fake_datetime
             }
+            # process fake_datetime
+            if self.options["fake_datetime"]:
+                try:
+                    self.options["fake_datetime"] = pd.to_datetime(self.options["fake_datetime"], format="%Y-%m-%d_%H-%M")
+                    print("Fake datetime was specified: " + self.options["fake_datetime"].strftime("%Y-%m-%d %H:%M") + ". Using this datetime for all files...")
+                except:
+                    print("Invalid fake datetime was specified: " + self.options["fake_datetime"] +  ". Ignoring...")
+                    self.options["fake_datetime"] = None
         elif args.mode == "initialize_index":
             self.options = {
                 "mode": args.mode,
