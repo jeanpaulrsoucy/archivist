@@ -30,7 +30,7 @@ def arg_parser():
     parser_prod.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser_prod.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
     parser_prod.add_argument("-t", "--fake-datetime", required = False, dest = "fake_datetime", help = "If present, the specified datetime will be used for all files instead of the current datetime (format: YYYY-MM-DD_HH-MM)")
-    parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl", "no-upload"], required = False, help = "Optional debug parameters")
+    parser_prod.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl", "force-ssl", "no-upload"], required = False, help = "Optional debug parameters")
     # subparser for mode "test"
     parser_test = subparsers.add_parser("test")
     parser_test.add_argument("project_dir", nargs = "?", default = os.getcwd(), help = "Path to the project directory (defaults to the working directory)")
@@ -42,7 +42,7 @@ def arg_parser():
     parser_test.add_argument("-i", "--allow-inactive", required = False, action = "store_true", dest = "allow_inactive", help = "If present, datasets marked as inactive will not be skipped")
     parser_test.add_argument("-r", "--random-order", required = False, action = "store_true", dest = "random_order", help = "If present, datasets will be downloaded in a random order")
     parser_test.add_argument("-t", "--fake-datetime", required = False, dest = "fake_datetime", help = "If present, the specified datetime will be used for all files instead of the current datetime (format: YYYY-MM-DD_HH-MM)")
-    parser_test.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl"], required = False, help = "Optional debug parameters")
+    parser_test.add_argument("-d", "--debug", nargs = "+", choices = ["print-md5", "ignore-ssl", "force-ssl"], required = False, help = "Optional debug parameters")
     # subparser for mode "initialize_index"
     parser_initialize_index = subparsers.add_parser("initialize_index")
     parser_initialize_index.add_argument("archive_dir", help = "Path to local mirror of S3 bucket")
@@ -109,6 +109,7 @@ class Archivist:
         self.debug_options = {
             "print_md5": True if "print-md5" in self.debug else False,
             "ignore_ssl": True if "ignore-ssl" in self.debug else False,
+            "force_ssl": True if "force-ssl" in self.debug else False,
             "no_upload": True if "no-upload" in self.debug else False
         }
         # load config
