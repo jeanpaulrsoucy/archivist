@@ -280,9 +280,11 @@ class Downloader:
             raise Exception("Request failed")
         # check if page source is above minimum expected size
         if html and min_size:
-            if len(req.text.encode("utf-8")) < min_size:
+            size = len(req.text.encode("utf-8"))
+            if size < min_size:
                 # raise exception
-                raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
+                raise Exception("Page source is below minimum expected size (actual size: " + format_size(size) +
+                                ", expected size: " + format_size(min_size) + ")")
         # DEBUG: print md5 hash of dataset
         if a.debug_options["print_md5"]:
             if html:
@@ -333,9 +335,11 @@ class Downloader:
         page_source = driver.page_source()
         # check if page source is above minimum expected size
         if min_size:
-            if len(page_source.encode("utf-8")) < min_size:
+            size = len(page_source.encode("utf-8"))
+            if size < min_size:
                 # raise exception
-                raise Exception("Page source is below minimum expected size (" + format_size(min_size) + ")")
+                raise Exception("Page source is below minimum expected size (actual size: " + format_size(size) +
+                                ", expected size: " + format_size(min_size) + ")")
         # DEBUG: print md5 hash of dataset
         if a.debug_options["print_md5"]:
             self.print_md5(page_source.encode("utf-8"))
