@@ -1,6 +1,6 @@
 # archivist
 
-Python-based digital archive tool currently powering the [Canadian COVID-19 Data Archive](https://github.com/ccodwg/Covid19CanadaArchive).
+Python-based digital archive tool that powered the [Canadian COVID-19 Data Archive](https://github.com/ccodwg/Covid19CanadaArchive) from August 2020 to January 2024. No longer undergoing active development.
 
 ## Installation
 
